@@ -22,11 +22,11 @@ def get_env_cfg():
 
     config.env_type = 'c'
 
-    config.num_agents = 3
+    config.num_agents = 2   #3->2로 수정
     config.num_adversaries = 0
 
     config.max_steps = 512
-    config.grid_size = 15
+    config.grid_size = 30   #15 -> 30으로 수정
     config.observation_style = 'dict'
     config.observe_position = False
     config.observe_self_position = True
@@ -34,7 +34,7 @@ def get_env_cfg():
     config.observe_t = False
     config.observe_done = False
     config.neutral_shape = True
-    config.can_overlap = False
+    config.can_overlap = True   #True로 바꿈
     config.active_after_done = False
 
     config.discrete_position = True
@@ -157,7 +157,7 @@ def get_config(args, eval=False):
     # automatically generate exp name based on configs
     # ===
 
-    curr_time = str(datetime.datetime.now())[:16].replace(' ', '_')
+    curr_time = str(datetime.datetime.now())[:19].replace(' ', '_') #초까지 나오도록 바꿈
 
     id_args = [['seed', config.env_cfg.seed],
                ['lr', config.lr],
