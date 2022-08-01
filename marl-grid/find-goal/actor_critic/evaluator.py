@@ -63,8 +63,9 @@ class Evaluator(mp.Process):
         self.net_type = net_type
         return
 
-    @torch.no_grad()
-    @within_cuda_device
+    @torch.no_grad()    # 이거 의미가 run() = torch.no_grad(run)
+    @within_cuda_device # run() = within_cuda_device(run)한 것을 toch.no_grad가 또 감싼다. 
+                        # 그래서 결국 run() = torch.no_grad(within_cuda_device(run()))인 셈이다.
     def run(self):
         self.master.init_tensorboard()
 

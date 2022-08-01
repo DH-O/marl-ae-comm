@@ -89,8 +89,8 @@ def get_env_creator(
         comm_len=1,
         discrete_comm=True,
         n_adversaries=0,
-        neutral_shape=True,
-        can_overlap=True,
+        neutral_shape=False,    # 에이전트를 삼각형으로 만들자
+        can_overlap=False,  #can_overlap을 false로 만들어버렸다.
         env_kwargs={}
 ):
     def env_creator(env_config):

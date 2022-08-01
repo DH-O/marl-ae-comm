@@ -9,6 +9,6 @@ def within_cuda_device(f):
 
     def _wrapper(*args):
         with torch.cuda.device(args[0].gpu_id):
-            return f(*args)
+            return f(*args) #내나 run(self) 이런 느낌입니다 ㅋㅋ
 
     return _wrapper

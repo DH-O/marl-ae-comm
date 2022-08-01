@@ -6,6 +6,30 @@ from enum import IntEnum
 
 from .objects import GridAgent, BonusTile
 
+from gym_minigrid.rendering import (
+    fill_coords,
+    point_in_circle,
+    point_in_rect,
+    point_in_triangle,
+    rotate_fn,
+)
+
+COLORS = {
+    'red': np.array([255, 0, 0]),
+    'orange': np.array([255, 165, 0]),
+    'green': np.array([0, 255, 0]),
+    'blue': np.array([0, 0, 255]),
+    'cyan': np.array([0, 139, 139]),
+    'purple': np.array([112, 39, 195]),
+    'yellow': np.array([255, 255, 0]),
+    'olive': np.array([128, 128, 0]),
+    'grey': np.array([100, 100, 100]),
+    'worst': np.array([74, 65, 42]),
+    'pink': np.array([255, 0, 189]),
+    'white': np.array([255, 255, 255]),
+    'prestige': np.array([255, 255, 255]),
+    'shadow': np.array([35, 25, 30]),  # dark purple color for invisible cells
+}
 
 class GridAgentInterface(GridAgent):
     class actions(IntEnum):
@@ -85,7 +109,7 @@ class GridAgentInterface(GridAgent):
         # "stay" action by default
         self.env_act = 4
         if self.restrict_actions:
-            env_act_dim = 5
+            env_act_dim = 8 # 다 해보자 ㅋㅋ
         else:
             env_act_dim = 6
 
@@ -303,7 +327,7 @@ class GridAgentInterface(GridAgent):
         """
         return np.add(self.pos, self.dir_vec)
 
-    def get_view_coords(self, i, j):
+    def get_view_coords(self, i, j):    # 이거 어디서 쓰던데 왜 나왔는지 잘 모르겠다
         """
         Translate and rotate absolute grid coordinates (i, j) into the
         agent's partially observable view (sub-grid). Note that the resulting

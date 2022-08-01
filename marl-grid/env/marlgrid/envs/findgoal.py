@@ -1,7 +1,7 @@
 import numpy as np
 
 from ..base import MultiGridEnv, MultiGrid
-from ..objects import Goal, Wall
+from ..objects import Goal, Wall, Destination
 
 
 def dis_func(x, y, k=1):
@@ -40,8 +40,14 @@ class FindGoalMultiGrid(MultiGridEnv):
         self.grid.wall_rect(0, 0, width, height)
 
         if getattr(self, 'randomize_goal', True):
-            goal_pos = self.place_obj(Goal(color='green', reward=1),
+            # goal_pos = self.place_obj(Goal(color='green', reward=1),
+            #                           max_tries=100)
+            goal_pos = [self.place_obj(Goal(color='green', reward=1),
+                                      max_tries=100) for i in range(self.num_agents)]   # goal 여러 개 형성
+            drop_pos = self.place_obj(Destination(color='white', reward=1), # 목적지 형성
                                       max_tries=100)
+            goal_pos.append(drop_pos)   # 골포즈에 목적지 위치까지 그냥 합쳐버림
+            
         else:
             goal_pos = np.asarray([width - 2, height - 2])
             self.put_obj(Goal(color='green', reward=1), width - 2, height - 2)
@@ -56,8 +62,11 @@ class FindGoalMultiGrid(MultiGridEnv):
             # an integer array storing agent's done info
             agent_done = np.zeros((len(self.agents, )), dtype=np.float)
         self.sees_goal = np.array([self.agents[i].in_view(
-                self.goal_pos[0], self.goal_pos[1]) for i in range(
-                self.num_agents)]) * 1
+                self.goal_pos[j][0], self.goal_pos[j][1]) for i in range(
+                self.num_agents) for j in range(self.num_agents)]) * 1  # 골이랑 목적지를 보이게 하는 것 같다.
+                        # np.array([self.agents[i].in_view(
+                # self.goal_pos[0], self.goal_pos[1]) for i in range(
+                # self.num_agents)]) * 1
 
         obs = {
             'adv_indices': self.adv_indices,
@@ -133,7 +142,7 @@ class FindGoalMultiGrid(MultiGridEnv):
                 # zero-sum reward between adversaries and non-adversaries
                 nonadv_done_n.append(agent.done)
                 adv_rew -= step_rewards[i]
-        nonadv_done = all(nonadv_done_n)
+        nonadv_done = all(nonadv_done_n)    #내부가 전부 참이어야지 True를 반환한다.
 
         timeout = (self.step_count >= self.max_steps)
 
@@ -164,7 +173,7 @@ class FindGoalMultiGrid(MultiGridEnv):
         return timeout, nonadv_done, step_rewards, ndis_to_goal
 
     def step(self, action_dict):
-        obs_dict, rew_dict, _, info_dict = MultiGridEnv.step(self, action_dict)
+        obs_dict, rew_dict, _, info_dict = MultiGridEnv.step(self, action_dict) # rew_dict를 통해 스파스 리워드 얻는 것 같다
         if self.active_after_done:
             done_n = [agent.at_pos(self.goal_pos) for agent in self.agents]
         else:

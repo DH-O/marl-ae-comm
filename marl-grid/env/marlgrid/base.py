@@ -8,11 +8,13 @@ import math
 import numpy as np
 import warnings
 from enum import IntEnum
-from gym_minigrid.rendering import fill_coords, point_in_rect, downsample, \
+from gym_minigrid.rendering import fill_coords, point_in_circle, point_in_triangle, downsample, \
     highlight_img
 
+#point in 여러개 추가했다.
 from .agents import GridAgentInterface
-from .objects import Wall, Goal, COLORS
+from .objects import GridAgent ,Wall, Goal, Destination, COLORS
+#데스티네이션을 추가했다.
 
 TILE_PIXELS = 32
 
@@ -235,6 +237,8 @@ class MultiGrid:
     def cache_render_fun(cls, key, f, *args, **kwargs):
         if key not in cls.tile_cache:
             cls.tile_cache[key] = f(*args, **kwargs)
+        if key[1] == 'GridAgentInterface':  # 에이전트는 매 캐쉬 랜더마다 갱신하도록 했다.
+            cls.tile_cache[key] = f(*args, **kwargs)
         return np.copy(cls.tile_cache[key])
 
     @classmethod
@@ -244,8 +248,8 @@ class MultiGrid:
                                         tile_size, subdivs)
         else:
             img = cls.cache_render_fun(
-                (tile_size, obj.__class__.__name__, *obj.encode()),
-                cls.render_object, obj, tile_size, subdivs
+                (tile_size, obj.__class__.__name__, *obj.encode()), # 위에서 key로 6, 'Wall', 6,9,0이 들어갔다. 즉 f가 render_object인 것이다. 
+                cls.render_object, obj, tile_size, subdivs  # 즉 cache_render_fun에서 render_object를 쓴다!
             )
             if hasattr(obj, 'render_post'):
                 return obj.render_post(img)
@@ -264,6 +268,14 @@ class MultiGrid:
         img = np.zeros((tile_size * subdivs, tile_size * subdivs, 3),
                        dtype=np.uint8)
         obj.render(img)
+        if obj.type == 'Agent':
+            if not (obj.carrying==None):
+                fill_coords(img, point_in_circle(0.5, 0.5, 0.31), COLORS[obj.color])   #골을 동그라미로 바꿔봤다.
+                shape_fn = point_in_triangle((0.12, 0.19), (0.87, 0.50),
+                                            (0.12, 0.81),)
+                shape_fn = rotate_fn(shape_fn, cx=0.5, cy=0.5,
+                                    theta=1.5 * np.pi * obj.dir)
+                fill_coords(img, shape_fn, COLORS[obj.color])  #잘 겹쳐 나오면 참 좋을텐데 어떻게 나올지 잘 모르겠다.
         return downsample(img, subdivs).astype(np.uint8)
 
     @classmethod
@@ -301,6 +313,8 @@ class MultiGrid:
                 img = cls.cache_render_obj(obj, tile_size, subdivs)
                 # If the base obj isn't an agent but has agents on top, render
                 # an agent and blend it in.
+                if ('Agent' in obj.type) and (not obj.carrying == None):
+                    img = cls.cache_render_obj(obj, tile_size, subdivs)
                 if len(obj.agents) > 0 and 'Agent' not in obj.type:
                     if top_agent in obj.agents:
                         img_agent = cls.cache_render_obj(top_agent, tile_size,
@@ -669,7 +683,7 @@ class MultiGridEnv(gym.Env):
         self.step_count += 1
 
         iter_agents = list(enumerate(zip(self.agents, actions)))
-        iter_order = np.arange(len(iter_agents))
+        iter_order = np.arange(len(iter_agents))    #에이전트 2개면 그냥 array([0,1]) 내뱉는다
         self.np_random.shuffle(iter_order)
         for shuffled_ix in iter_order:
             agent_no, (agent, action) = iter_agents[shuffled_ix]
@@ -730,36 +744,64 @@ class MultiGridEnv(gym.Env):
                         agent.agents = []
 
                         # agent can only receive rewards if fwd_cell has a
-                        # "get_reward" method && the agent is not already done
-                        if not agent.done:
+                        # "get_reward" method && the agent is not already done #이 아니라 carrying 아닐 때
+                        # # if action == agent.actions.pickup and   
+                        #     if hasattr(fwd_cell, 'get_reward'):
+                        #         rwd = fwd_cell.get_reward(agent)
+                        #         env_rew, step_rew = self._get_reward(
+                        #             rwd, agent_no)
+                        #         env_rewards += env_rew
+                        #         step_rewards += step_rew
+
+                        # if isinstance(fwd_cell, Goal):  # 골이랑 만나면 에이전트가 사라진다.
+                        #     agent.carrying = True  #우선 바꿔보자 모르겠다
+                        #     self.grid.set(*fwd_pos, None) #이러면 골이 사라질지도
+                        #     self.grid.set(*fwd_pos, agent)
+                        
+                        # if np.array_equal(fwd_pos, agent.pos_init):
+                        #     if agent.carrying:
+                        #         agent.carrying = None
+                        #         self.grid.set(*fwd_pos, None)
+                        #         # agent.carrying.cur_pos = fwd_pos
+                        #         env_rewards += 1
+                        #         step_rewards += 1
+                        #         agent.done = True
+                        #     else:
+                        #         pass
+
+                # Pick up an object
+                elif action == agent.actions.pickup:
+                    if fwd_cell and fwd_cell.can_pickup():
+                        if agent.carrying is None:
+                            if isinstance(fwd_cell, Goal):
+                                if hasattr(fwd_cell, 'get_reward'):
+                                    rwd = fwd_cell.get_reward(agent)
+                                    env_rew, step_rew = self._get_reward(
+                                        rwd, agent_no)
+                                    env_rewards += env_rew
+                                    step_rewards += step_rew
+                                agent.carrying = fwd_cell
+                                agent.carrying.cur_pos = np.array([-1, -1])
+                                self.grid.set(*fwd_pos, None)
+                            else:
+                                pass
+
+                # Drop an object
+                elif action == agent.actions.drop:
+                    if fwd_cell and agent.carrying:
+                        if isinstance(fwd_cell, Destination):
                             if hasattr(fwd_cell, 'get_reward'):
                                 rwd = fwd_cell.get_reward(agent)
                                 env_rew, step_rew = self._get_reward(
                                     rwd, agent_no)
                                 env_rewards += env_rew
                                 step_rewards += step_rew
-
-                        if isinstance(fwd_cell, Goal):
-                            agent.done = True
-
-                # Pick up an object
-                elif action == agent.actions.pickup:
-                    if fwd_cell and fwd_cell.can_pickup():
-                        if agent.carrying is None:
-                            agent.carrying = fwd_cell
-                            agent.carrying.cur_pos = np.array([-1, -1])
-                            self.grid.set(*fwd_pos, None)
-                    else:
-                        pass
-
-                # Drop an object
-                elif action == agent.actions.drop:
-                    if not fwd_cell and agent.carrying:
-                        self.grid.set(*fwd_pos, agent.carrying)
-                        agent.carrying.cur_pos = fwd_pos
-                        agent.carrying = None
-                    else:
-                        pass
+                                # self.grid.set(*fwd_pos, agent.carrying)
+                                # agent.carrying.cur_pos = fwd_pos
+                                agent.carrying = None
+                            # self.grid.set(*cur_pos, None)
+                        else:
+                            pass
 
                 # Toggle/activate an object
                 elif action == agent.actions.toggle:

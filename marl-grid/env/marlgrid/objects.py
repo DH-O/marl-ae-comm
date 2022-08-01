@@ -79,7 +79,7 @@ class WorldObj(metaclass=RegisteredObjectType):
         return False
 
     def can_pickup(self):
-        return False
+        return False #우선 뒤에서 다른 클래스에서 리턴 트루로 바꾸긴 했다. 
 
     def can_contain(self):
         return False
@@ -136,6 +136,18 @@ class GridAgent(WorldObj):
         self.neutral_shape = neutral_shape
 
         self._can_overlap = can_overlap
+        
+        # img_init = np.zeros((32 * 3, 32 * 3, 3),  #초기 위치 마킹하려 했는데 아무 짝에 쓸모 없더라.
+        #                dtype=np.uint8)
+        # fill_coords(img_init, point_in_rect(0.2, 0.8, 0.2, 0.8), COLORS[self.color])
+        # if self.neutral_shape:
+        #     shape_fn = point_in_circle(0.5, 0.5, 0.31)
+        # else:
+        #     shape_fn = point_in_triangle((0.12, 0.19), (0.87, 0.50),
+        #                                  (0.12, 0.81),)
+        #     shape_fn = rotate_fn(shape_fn, cx=0.5, cy=0.5,
+        #                          theta=1.5 * np.pi * self.dir)
+        # fill_coords(img, shape_fn, COLORS[self.color])
 
     @property
     def dir(self):
@@ -163,8 +175,7 @@ class GridAgent(WorldObj):
                                          (0.12, 0.81),)
             shape_fn = rotate_fn(shape_fn, cx=0.5, cy=0.5,
                                  theta=1.5 * np.pi * self.dir)
-        fill_coords(img, shape_fn, COLORS[self.color])
-
+        fill_coords(img, shape_fn, COLORS[self.color])  #여기서 Img는 그냥 텅 빈 공간인데 거기서 shape_fn으로 채운다는 것 같다
 
 class BulkObj(WorldObj, metaclass=RegisteredObjectType):
     def __hash__(self):
@@ -231,17 +242,39 @@ class Goal(WorldObj):
         self.reward = reward
 
     def can_overlap(self):
-        return True
+        return False
 
     def get_reward(self, agent):
         return self.reward
 
     def str_render(self, dir=0):
         return 'GG'
+    
+    def can_pickup(self):
+        return True
+
+    def render(self, img):
+        fill_coords(img, point_in_circle(0.5, 0.5, 0.31), COLORS[self.color])
+
+class Destination(WorldObj):
+    def __init__(self, reward, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.reward = reward
+
+    def can_overlap(self):
+        return False
+
+    def get_reward(self, agent):
+        return self.reward
+
+    def str_render(self, dir=0):
+        return 'GG'
+    
+    def can_pickup(self):
+        return True
 
     def render(self, img):
         fill_coords(img, point_in_rect(0, 1, 0, 1), COLORS[self.color])
-
 
 class Wall(BulkObj):
     def see_behind(self):

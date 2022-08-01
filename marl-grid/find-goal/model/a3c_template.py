@@ -17,7 +17,7 @@ def take_action(policy_logit, action_size):
     entropy = -(policy * log_policy).sum()
 
     policy = ops.to_numpy(policy)
-    action = np.random.choice(action_size, p=policy)
+    action = np.random.choice(action_size, p=policy)    #p 확률로 뽑는다
     action_logp = log_policy[action]
     return action, action_logp, entropy
 

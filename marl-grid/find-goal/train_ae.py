@@ -27,6 +27,7 @@ if __name__ == '__main__':
     print(torch.multiprocessing.get_start_method())
     mp.set_start_method('spawn', force=True)
     os.environ['OMP_NUM_THREADS'] = '1'
+    # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
     cfg = config.parse()
     assert cfg.env_cfg.comm_len > 0
