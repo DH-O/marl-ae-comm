@@ -11,7 +11,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args": ["--set", "num_workers", "1", "env_cfg.comm_len", "8", "--gpu", "0"]
+            "args": ["--set", "num_workers", "1", "env_cfg.comm_len", "8", "--gpu", "2", "--message", "test"]
         }
     ]
 }

@@ -8,7 +8,7 @@ import math
 import numpy as np
 import warnings
 from enum import IntEnum
-from gym_minigrid.rendering import fill_coords, point_in_circle, point_in_triangle, downsample, \
+from gym_minigrid.rendering import fill_coords, point_in_circle, point_in_triangle, rotate_fn,downsample, \
     highlight_img
 
 #point in 여러개 추가했다.
@@ -270,12 +270,12 @@ class MultiGrid:
         obj.render(img)
         if obj.type == 'Agent':
             if not (obj.carrying==None):
-                fill_coords(img, point_in_circle(0.5, 0.5, 0.31), COLORS[obj.color])   #골을 동그라미로 바꿔봤다.
+                fill_coords(img, point_in_circle(0.5, 0.5, 0.31), COLORS['green'])   #골을 동그라미로 바꿔봤다.
                 shape_fn = point_in_triangle((0.12, 0.19), (0.87, 0.50),
                                             (0.12, 0.81),)
                 shape_fn = rotate_fn(shape_fn, cx=0.5, cy=0.5,
                                     theta=1.5 * np.pi * obj.dir)
-                fill_coords(img, shape_fn, COLORS[obj.color])  #잘 겹쳐 나오면 참 좋을텐데 어떻게 나올지 잘 모르겠다.
+                fill_coords(img, shape_fn, COLORS[obj.color])
         return downsample(img, subdivs).astype(np.uint8)
 
     @classmethod

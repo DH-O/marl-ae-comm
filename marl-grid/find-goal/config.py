@@ -33,7 +33,7 @@ def get_env_cfg():
     config.observe_self_env_act = False
     config.observe_t = False
     config.observe_done = False
-    config.neutral_shape = True
+    config.neutral_shape = False #로 바꿨다
     config.can_overlap = False
     config.active_after_done = False
 
@@ -78,6 +78,7 @@ def get_config(args, eval=False):
     config.run_dir = 'runs'
     config.num_workers = 16
     config.gpu = [int(g) for g in args.gpu]
+    config.message = args.message
 
     # the prefix to the log
     config.id = ''
@@ -164,7 +165,8 @@ def get_config(args, eval=False):
                ['tmax', config.tmax],
                ['workers', config.num_workers],
                ['ms', config.env_cfg.max_steps],
-               ['ae_type', config.ae_type]]
+               ['ae_type', config.ae_type],
+               ['message', config.message]]
 
     if config.comm_vf:
         id_args += [['commvf', 'True']]
@@ -199,6 +201,7 @@ def parse(eval=False):
     parser.add_argument('--set', nargs='+')
     parser.add_argument('--gpu', nargs='+', default='0',
                         help='specify GPUs. (e.g. `0` or `0 1`)')
+    parser.add_argument('--message', type=str, default=None)
 
     args = parser.parse_args()
 

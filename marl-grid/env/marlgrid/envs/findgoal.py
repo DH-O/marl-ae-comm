@@ -43,7 +43,7 @@ class FindGoalMultiGrid(MultiGridEnv):
             # goal_pos = self.place_obj(Goal(color='green', reward=1),
             #                           max_tries=100)
             goal_pos = [self.place_obj(Goal(color='green', reward=1),
-                                      max_tries=100) for i in range(self.num_agents)]   # goal 여러 개 형성
+                                      max_tries=100) for i in range((self.num_agents)*2)]   # goal 여러 개 형성
             drop_pos = self.place_obj(Destination(color='white', reward=1), # 목적지 형성
                                       max_tries=100)
             goal_pos.append(drop_pos)   # 골포즈에 목적지 위치까지 그냥 합쳐버림

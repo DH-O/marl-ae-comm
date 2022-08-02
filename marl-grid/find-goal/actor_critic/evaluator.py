@@ -197,4 +197,5 @@ class Evaluator(mp.Process):
             time.sleep(self.sleep_duration)
 
         print('evaluator is done.')
+        print(latest_path)
         return

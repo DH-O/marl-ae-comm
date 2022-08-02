@@ -254,7 +254,7 @@ class Goal(WorldObj):
         return True
 
     def render(self, img):
-        fill_coords(img, point_in_circle(0.5, 0.5, 0.31), COLORS[self.color])
+        fill_coords(img, point_in_circle(0.5, 0.5, 0.31), COLORS[self.color])   #골을 동그라미로 바꿔봤다.
 
 class Destination(WorldObj):
     def __init__(self, reward, *args, **kwargs):
