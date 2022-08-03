@@ -6,13 +6,13 @@ from enum import IntEnum
 
 from .objects import GridAgent, BonusTile
 
-from gym_minigrid.rendering import (
-    fill_coords,
-    point_in_circle,
-    point_in_rect,
-    point_in_triangle,
-    rotate_fn,
-)
+# from gym_minigrid.rendering import (
+#     fill_coords,
+#     point_in_circle,
+#     point_in_rect,
+#     point_in_triangle,
+#     rotate_fn,
+# )
 
 COLORS = {
     'red': np.array([255, 0, 0]),

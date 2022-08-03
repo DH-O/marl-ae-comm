@@ -54,7 +54,7 @@ def get_env_name(env_cfg):
     Automatically generate env name from env configs.
     """
     assert env_cfg.env_type == 'c'  # assert 다음 문장이 꼭 참이어야 한다.
-    name = f'MarlGrid-{env_cfg.num_agents}Agent-Finding{env_cfg.num_agents}GoalsAndReturnToDestination'
+    name = f'MarlGrid-{env_cfg.num_agents}Agent-Finding{env_cfg.num_agents*2}GoalsAndReturnToDestination'   #현재 골을 에이전트 수보다 두 배 더 많게 생성 중이다. 
 
     if env_cfg.comm_len > 0:
         name += f'{env_cfg.comm_len}C'

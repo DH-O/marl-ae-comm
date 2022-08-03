@@ -52,7 +52,7 @@ class Worker(mp.Process):
         self.gpu_id = gpu_id
         self.reward_log = deque(maxlen=5)  # track last 5 finished rewards
         self.pfmt = 'policy loss: {} value loss: {} ' + \
-                    'entropy loss: {} ae loss: {} reward: {} local consumed time: {}'
+                    'entropy loss: {} ae loss: {} reward: {} time now: {}'
         self.agents = [f'agent_{i}' for i in range(self.env.num_agents)]
         self.num_acts = 1
         self.ae_loss_k = ae_loss_k
@@ -129,7 +129,7 @@ class Worker(mp.Process):
 
         global_start = time.time()
         while not self.master.is_done():
-            local_start = time.time()
+            # local_start = time.time()
             # synchronize network parameters
             weight_iter = self.master.copy_weights(self.net)
             self.net.zero_grad()
@@ -223,9 +223,10 @@ class Worker(mp.Process):
                 for k, v in log_dict.items():
                     self.master.writer.add_scalar(k, v, weight_iter)
 
-            local_end = time.time()
-            local_consumed_time_ = local_end - local_start
-            local_consumed_time = str(datetime.timedelta(seconds=local_consumed_time_)).split(".")
+            # local_end = time.time()
+            # local_consumed_time_ = local_end - local_start
+            # local_consumed_time = str(datetime.timedelta(seconds=local_consumed_time_)).split(".")
+            now = str(datetime.datetime.now()).split(".")
             # all_pls, all_vls, all_els shape == (num_acts, num_agents)
             progress_str = self.pfmt.format(
                 np.around(np.mean(all_pls, axis=-1), decimals=5),
@@ -233,7 +234,7 @@ class Worker(mp.Process):
                 np.around(np.mean(all_els, axis=-1), decimals=5),
                 np.around(np.mean(comm_ae_losses), decimals=5),
                 np.around(np.mean(self.reward_log), decimals=2),
-                local_consumed_time
+                now[0]
             )
 
             self.master.apply_gradients(self.net)
@@ -243,5 +244,5 @@ class Worker(mp.Process):
         global_end = time.time()
         global_consumed_time_ = global_end - global_start
         global_consumed_time = str(datetime.timedelta(seconds=global_consumed_time_)).split(".")
-        print(f'The total consumed time: {global_consumed_time}')
+        print(f'The total consumed time: {global_consumed_time[0]}')
         return

@@ -242,7 +242,7 @@ class Goal(WorldObj):
         self.reward = reward
 
     def can_overlap(self):
-        return False
+        return False    #원래는 True였다.
 
     def get_reward(self, agent):
         return self.reward

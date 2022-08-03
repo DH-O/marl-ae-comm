@@ -11,7 +11,7 @@ import numpy as np
 import os
 import os.path as osp
 import sys
-import time
+import datetime
 
 import config
 from envs.environments import make_environment
@@ -28,6 +28,7 @@ if __name__ == '__main__':
     mp.set_start_method('spawn', force=True)
     os.environ['OMP_NUM_THREADS'] = '1'
     # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+    start_time = str(datetime.datetime.now()).split(".")
 
     cfg = config.parse()
     assert cfg.env_cfg.comm_len > 0
@@ -108,4 +109,6 @@ if __name__ == '__main__':
 
     master.save_ckpt(cfg.train_iter,
                      osp.join(save_dir_fmt.format('ckpt'), 'latest.pth'))
-
+    end_time = str(datetime.datetime.now()).split(".")
+    print(f"Code start time: {start_time[0]}")
+    print(f"Code end time: {end_time[0]}")
