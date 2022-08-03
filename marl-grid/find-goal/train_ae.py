@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 import os
 import os.path as osp
-import sys
+import time
 import datetime
 
 import config
@@ -28,11 +28,13 @@ if __name__ == '__main__':
     mp.set_start_method('spawn', force=True)
     os.environ['OMP_NUM_THREADS'] = '1'
     # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
-    start_time = str(datetime.datetime.now()).split(".")
+    start_time = time.time()
+    start_time_str_list = str(datetime.datetime.now()).split(".")
 
     cfg = config.parse()
     assert cfg.env_cfg.comm_len > 0
 
+    save_dir = osp.join(f'./{cfg.run_dir}', cfg.exp_name + '/')
     save_dir_fmt = osp.join(f'./{cfg.run_dir}', cfg.exp_name + '/{}_ae')
     print('>> {}'.format(cfg.exp_name))
 
@@ -109,6 +111,11 @@ if __name__ == '__main__':
 
     master.save_ckpt(cfg.train_iter,
                      osp.join(save_dir_fmt.format('ckpt'), 'latest.pth'))
-    end_time = str(datetime.datetime.now()).split(".")
-    print(f"Code start time: {start_time[0]}")
-    print(f"Code end time: {end_time[0]}")
+    end_time = time.time()
+    end_time_str_list = str(datetime.datetime.now()).split(".")
+    consumed_time = end_time-start_time
+    total_code_consumed_time = str(datetime.timedelta(seconds=consumed_time)).split(".")
+    print(f"Code start time: {start_time_str_list[0]}")
+    print(f"Code end time: {end_time_str_list[0]}")
+    with open(os.path.join(save_dir, 'consumingTime.txt'), 'w') as fout:
+        fout.write(f"{total_code_consumed_time[0]}")
