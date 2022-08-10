@@ -136,18 +136,6 @@ class GridAgent(WorldObj):
         self.neutral_shape = neutral_shape
 
         self._can_overlap = can_overlap
-        
-        # img_init = np.zeros((32 * 3, 32 * 3, 3),  #초기 위치 마킹하려 했는데 아무 짝에 쓸모 없더라.
-        #                dtype=np.uint8)
-        # fill_coords(img_init, point_in_rect(0.2, 0.8, 0.2, 0.8), COLORS[self.color])
-        # if self.neutral_shape:
-        #     shape_fn = point_in_circle(0.5, 0.5, 0.31)
-        # else:
-        #     shape_fn = point_in_triangle((0.12, 0.19), (0.87, 0.50),
-        #                                  (0.12, 0.81),)
-        #     shape_fn = rotate_fn(shape_fn, cx=0.5, cy=0.5,
-        #                          theta=1.5 * np.pi * self.dir)
-        # fill_coords(img, shape_fn, COLORS[self.color])
 
     @property
     def dir(self):
@@ -242,7 +230,7 @@ class Goal(WorldObj):
         self.reward = reward
 
     def can_overlap(self):
-        return False    #원래는 True였다.
+        return True    #원래는 True였다. 다시 트루로 하면 애러가 뜨는 것 같던데
 
     def get_reward(self, agent):
         return self.reward
@@ -271,7 +259,7 @@ class Destination(WorldObj):
         return 'GG'
     
     def can_pickup(self):
-        return True
+        return False
 
     def render(self, img):
         fill_coords(img, point_in_rect(0, 1, 0, 1), COLORS[self.color])

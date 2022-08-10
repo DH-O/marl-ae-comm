@@ -75,9 +75,9 @@ class Worker(mp.Process):
             done: updated indicator
         """
         # mask first (environment) actions after an agent is done
-        env_mask_idx = [None for _ in range(len(self.agents))]
+        env_mask_idx = [None for _ in range(len(self.agents))]  #에이전트 수만큼 None생성
 
-        trajectory = [[] for _ in range(self.num_acts)]
+        trajectory = [[] for _ in range(self.num_acts)] # 이거 왜 range가 하나밖에 안 나올까요?
 
         while not check_done(done) and len(trajectory[0]) < self.t_max:
             plogit, value, hidden_state, comm_out, comm_ae_loss = self.net(
@@ -129,15 +129,14 @@ class Worker(mp.Process):
 
         global_start = time.time()
         while not self.master.is_done():
-            # local_start = time.time()
             # synchronize network parameters
             weight_iter = self.master.copy_weights(self.net)
-            self.net.zero_grad()
+            self.net.zero_grad()    #그레디언트 초기화. 싹 다 0으로 만드는 것 같다.
 
             # reset environment if new episode
             if check_done(done):
                 state = self.env.reset()
-                state_var = ops.to_state_var(state)
+                state_var = ops.to_state_var(state) #dict to state variable. 사실 글로벌 스테이트를 에이전트별로 쪼갰다고 생각해도 된다.
                 hidden_state = None
 
                 if self.net.is_recurrent:

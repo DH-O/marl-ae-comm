@@ -25,7 +25,7 @@ def get_env_cfg():
     config.num_agents = 3 
     config.num_adversaries = 0
 
-    config.max_steps = 512
+    config.max_steps = 768  #max steps 늘려봤다
     config.grid_size = 15
     config.observation_style = 'dict'
     config.observe_position = False
@@ -201,7 +201,7 @@ def parse(eval=False):
     parser.add_argument('--set', nargs='+')
     parser.add_argument('--gpu', nargs='+', default='0',
                         help='specify GPUs. (e.g. `0` or `0 1`)')
-    parser.add_argument('--message', type=str, default=None)
+    parser.add_argument('--message', type=str, default='test')
 
     args = parser.parse_args()
 

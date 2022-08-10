@@ -7,9 +7,13 @@ import gym_minigrid
 import math
 import numpy as np
 import warnings
+import matplotlib.pyplot as plt
+import os
+
 from enum import IntEnum
 from gym_minigrid.rendering import fill_coords, point_in_circle, point_in_triangle, rotate_fn,downsample, \
     highlight_img
+from torch import has_spectral
 
 #point in 여러개 추가했다.
 from .agents import GridAgentInterface
@@ -237,9 +241,11 @@ class MultiGrid:
     def cache_render_fun(cls, key, f, *args, **kwargs):
         if key not in cls.tile_cache:
             cls.tile_cache[key] = f(*args, **kwargs)
+        #########
         if key[1] == 'GridAgentInterface':  # 에이전트는 매 캐쉬 랜더마다 갱신하도록 했다.
             cls.tile_cache[key] = f(*args, **kwargs)
         return np.copy(cls.tile_cache[key])
+        #########
 
     @classmethod
     def cache_render_obj(cls, obj, tile_size, subdivs):
@@ -268,6 +274,7 @@ class MultiGrid:
         img = np.zeros((tile_size * subdivs, tile_size * subdivs, 3),
                        dtype=np.uint8)
         obj.render(img)
+        ########
         if obj.type == 'Agent':
             if not (obj.carrying==None):
                 fill_coords(img, point_in_circle(0.5, 0.5, 0.31), COLORS['green'])   #골을 동그라미로 바꿔봤다.
@@ -276,6 +283,7 @@ class MultiGrid:
                 shape_fn = rotate_fn(shape_fn, cx=0.5, cy=0.5,
                                     theta=1.5 * np.pi * obj.dir)
                 fill_coords(img, shape_fn, COLORS[obj.color])
+        ########
         return downsample(img, subdivs).astype(np.uint8)
 
     @classmethod
@@ -700,10 +708,37 @@ class MultiGridEnv(gym.Env):
 
             if agent.active:
                 cur_pos = agent.pos[:]
+                i = 0
                 cur_cell = self.grid.get(*cur_pos)
+                #########
+                while not cur_cell:
+                    self.grid.set(*cur_pos, agent)
+                    cur_cell = self.grid.get(*cur_pos)
+                    print(f"cur_cell: {cur_cell}")
+                    i += 1
+                    if i == 100:
+                        print("i is 100!")
+                        print(f"cur_cell: {cur_cell}")
+                        break
+                if not cur_cell:
+                    img_cur_pos = self.grid.render(tile_size=TILE_PIXELS)
+                    if not os.path.isdir(f'./{agent}/'):
+                        os.makedirs(f'./{agent}/')
+                    plt.imsave(f'./{agent}/' + f'{agent} not cur_cell.jpeg', img_cur_pos/255.)
+                #######
+                
                 fwd_pos = agent.front_pos[:]
                 fwd_cell = self.grid.get(*fwd_pos)
+                
+                ######
+                if not cur_cell:
+                    img_fwd_pos = self.grid.render(tile_size=TILE_PIXELS)
+                    if not os.path.isdir(f'./{agent}/'):
+                        os.makedirs(f'./{agent}/')
+                    plt.imsave(f'./{agent}/' + f'{agent} not cur_cell_fwd_cell.jpeg', img_fwd_pos/255.)
+                #######
                 agent_moved = False
+
 
                 # right, down, left, up
                 if action in {0, 1, 2, 3}:
@@ -721,14 +756,26 @@ class MultiGridEnv(gym.Env):
                         else:
                             fwd_cell.agents.append(agent)
                             agent.pos = fwd_pos
+                        
+                        #######
+                        if not cur_cell:
+                            img_cur_pos = self.grid.render(tile_size=TILE_PIXELS)
+                            if not os.path.isdir(f'./{agent}/'):
+                                os.makedirs(f'./{agent}/')
+                            plt.imsave(f'./{agent}/' + f'{agent} not cur_cell after move.jpeg', img_cur_pos/255.)
+                        #######
 
                         # Remove agent from old cell
                         if cur_cell == agent:
                             self.grid.set(*cur_pos, None)
                         else:
-                            assert cur_cell.can_overlap()
-                            cur_cell.agents.remove(agent)
-
+                            if not hasattr(cur_cell,'can_overlap'):
+                                pass
+                            else:
+                                if agent in cur_cell.agents:
+                                    cur_cell.agents.remove(agent)
+                            # assert cur_cell.can_overlap()   #marlgrid.agents.GridAgentInterface object
+                            
                         # Add agent's agents to old cell
                         for left_behind in agent.agents:
                             cur_obj = self.grid.get(*cur_pos)
@@ -752,22 +799,6 @@ class MultiGridEnv(gym.Env):
                         #             rwd, agent_no)
                         #         env_rewards += env_rew
                         #         step_rewards += step_rew
-
-                        # if isinstance(fwd_cell, Goal):  # 골이랑 만나면 에이전트가 사라진다.
-                        #     agent.carrying = True  #우선 바꿔보자 모르겠다
-                        #     self.grid.set(*fwd_pos, None) #이러면 골이 사라질지도
-                        #     self.grid.set(*fwd_pos, agent)
-                        
-                        # if np.array_equal(fwd_pos, agent.pos_init):
-                        #     if agent.carrying:
-                        #         agent.carrying = None
-                        #         self.grid.set(*fwd_pos, None)
-                        #         # agent.carrying.cur_pos = fwd_pos
-                        #         env_rewards += 1
-                        #         step_rewards += 1
-                        #         agent.done = True
-                        #     else:
-                        #         pass
 
                 # Pick up an object
                 elif action == agent.actions.pickup:

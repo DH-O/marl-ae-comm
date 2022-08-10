@@ -92,7 +92,7 @@ class InputProcessor(nn.Module):
             xs = torch.chunk(x, self.num_agents)
 
         # concatenate observation features
-        cat_feat = [self.img_layer_norm(xs[i]) for i in range(self.num_agents)]
+        cat_feat = [self.img_layer_norm(xs[i]) for i in range(self.num_agents)] #agent 0,1,2로 쪼개서 저장했다 다행이도
 
         if self.state_feat_fc is None:
             if comm is not None:
@@ -348,7 +348,7 @@ class AENetwork(A3CTemplate):
         return
 
     def init_hidden(self):
-        return [head.init_hidden() for head in self.head]
+        return [head.init_hidden() for head in self.head]   #LSTMhear.init_hidden을 반환함
 
     def take_action(self, policy_logit, comm_out):
         act_dict = {}
@@ -366,7 +366,7 @@ class AENetwork(A3CTemplate):
             all_act_dict[agent_name] = [act, comm_act]
         return act_dict, act_logp_dict, ent_list, all_act_dict
 
-    def forward(self, inputs, hidden_state=None, env_mask_idx=None):
+    def forward(self, inputs, hidden_state=None, env_mask_idx=None):    #
         assert type(inputs) is dict
         assert len(inputs.keys()) == self.num_agents + 1  # agents + global
 
@@ -380,7 +380,7 @@ class AENetwork(A3CTemplate):
                 cf = cf.detach()
             comm_feat.append(cf)
 
-        cat_feat = self.input_processor(inputs, comm_feat)
+        cat_feat = self.input_processor(inputs, comm_feat)  # 이거
 
         # (2) generate AE comm output and reconstruction loss
         with torch.no_grad():

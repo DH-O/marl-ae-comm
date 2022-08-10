@@ -53,7 +53,7 @@ if __name__ == '__main__':
 
     # (2) create master network.
     # hogwild-style update will be applied to the master weight.
-    master_lock = mp.Lock()
+    master_lock = mp.Lock() #이거 해야 출력이 순서대로 된다나 그렇다네요.
     net = create_net()
     net.share_memory()
 
@@ -111,6 +111,8 @@ if __name__ == '__main__':
 
     master.save_ckpt(cfg.train_iter,
                      osp.join(save_dir_fmt.format('ckpt'), 'latest.pth'))
+    
+    
     end_time = time.time()
     end_time_str_list = str(datetime.datetime.now()).split(".")
     consumed_time = end_time-start_time

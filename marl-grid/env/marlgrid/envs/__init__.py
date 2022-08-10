@@ -30,7 +30,7 @@ def make_agents(
         n_adversaries=0,
         see_through_walls=True,
         neutral_shape=True,
-        can_overlap=True,
+        can_overlap=True,   #트루로 다시 복귀했다.
 ):
     colors = ['red', 'blue', 'purple', 'orange', 'olive', 'pink']
     assert n_agents <= len(colors)
@@ -90,7 +90,7 @@ def get_env_creator(
         discrete_comm=True,
         n_adversaries=0,
         neutral_shape=False,    # 에이전트를 삼각형으로 만들자
-        can_overlap=True,  #can_overlap을 false로 만들어버렸었는데 True로 다시 돌려보자.
+        can_overlap=True,   # 트루로 복귀했다.
         env_kwargs={}
 ):
     def env_creator(env_config):
