@@ -274,7 +274,7 @@ class GridAgentInterface(GridAgent):
         self.prestige *= self.prestige_beta
 
     def reward(self, rew):
-        if self.allow_negative_prestige:
+        if self.allow_negative_prestige:    # 우선 False로 기본설정되어 있는 것 같다.
             self.rew += rew
         else:
             if rew >= 0:

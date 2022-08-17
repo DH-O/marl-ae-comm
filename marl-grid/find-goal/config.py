@@ -25,7 +25,7 @@ def get_env_cfg():
     config.num_agents = 3 
     config.num_adversaries = 0
 
-    config.max_steps = 768  #max steps 늘려봤다
+    config.max_steps = 1024  #max steps 늘려봤다
     config.grid_size = 15
     config.observation_style = 'dict'
     config.observe_position = False
@@ -54,7 +54,7 @@ def get_env_cfg():
 
     # team reward settings
 
-    config.team_reward_type = 'share'
+    config.team_reward_type = 'const'   #이렇게 해보자 한 번
     config.team_reward_freq = 'none'
     config.team_reward_multiplier = 1
 

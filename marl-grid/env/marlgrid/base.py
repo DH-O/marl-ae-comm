@@ -394,12 +394,12 @@ class MultiGridEnv(gym.Env):
         respawn = config.get('respawn')
         ghost_mode = config.get('ghost_mode')
         agent_spawn_kwargs = config.get('agent_spawn_kwargs', {})
-        team_reward_multiplier = config.get('team_reward_multiplier')
-        team_reward_type = config.get('team_reward_type')
-        team_reward_freq = config.get('team_reward_freq')
+        team_reward_multiplier = config.get('team_reward_multiplier')   # 1을 곱했다.
+        team_reward_type = config.get('team_reward_type')               # share
+        team_reward_freq = config.get('team_reward_freq')               # none이랜다.
         active_after_done = config.get('active_after_done')
         discrete_position = config.get('discrete_position')
-        separate_rew_more = config.get('separate_rew_more')
+        separate_rew_more = config.get('separate_rew_more')             #  False랜다.
 
         self.debug = config.get('debug', False)
 
@@ -831,6 +831,10 @@ class MultiGridEnv(gym.Env):
                                 # agent.carrying.cur_pos = fwd_pos
                                 agent.carrying = None
                             # self.grid.set(*cur_pos, None)
+                            if env_rewards.sum() == 12:
+                                for agent in self.agents:
+                                    agent.done = True
+                                    print(f"{agent} is done")
                         else:
                             pass
 

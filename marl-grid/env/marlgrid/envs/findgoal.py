@@ -137,21 +137,28 @@ class FindGoalMultiGrid(MultiGridEnv):
     def update_reward(self, step_rewards):
         nonadv_done_n = []
         adv_rew = 0.0
+        ######
+        total_rew = 0
+        ######
         for i, agent in enumerate(self.agents):
             if i not in self.adv_indices:
                 # zero-sum reward between adversaries and non-adversaries
                 nonadv_done_n.append(agent.done)
+                #####
+                total_rew += agent.prestige
+                #####
                 adv_rew -= step_rewards[i]
         nonadv_done = all(nonadv_done_n)    #내부가 전부 참이어야지 True를 반환한다.
 
         timeout = (self.step_count >= self.max_steps)
 
         # normalized distance-to-goal to range [0, 1]
-        ndis_to_goal = [dis_func(agent.pos, self.goal_pos, k=self.max_dis)
+        ndis_to_goal = [dis_func(agent.pos, self.goal_pos, k=self.max_dis)  # max_dis = np.sqrt(np.sum(np.square([self.width, self.height])))
                         for agent in self.agents]
 
-        if self.team_reward_type == 'const':
+        if self.team_reward_type == 'const':    # 세상에 몰랐는데 이게 팀리워드 다 주는 조건 맞는 것 같은데요?
             # give constant team reward to non-adversaries
+            # if total_rew == 6:
             if nonadv_done:
                 team_rwd = self.team_reward_multiplier
                 for i, a in enumerate(self.agents):
@@ -218,7 +225,7 @@ class FindGoalMultiGrid(MultiGridEnv):
         }
 
         # team reward
-        if self.separate_rew_more:
+        if self.separate_rew_more:  #우선 False인 것 같다. 
             info_dict['rew_by_act'][1] = {f'agent_{i}': (
                     step_rewards[i] - env_rewards[i]) for i in range(
                 len(step_rewards))}

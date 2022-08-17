@@ -108,7 +108,7 @@ class Worker(mp.Process):
 
         #  compute Loss: accumulate rewards and compute gradient
         values = [{k: None for k in self.agents} for _ in range(
-            self.num_acts)]
+            self.num_acts)] # self.num_acts가 1이네요?
 
         # GAE
         for k in self.agents:
@@ -116,7 +116,7 @@ class Worker(mp.Process):
                 values[aid][k] = [x[k] for x in list(
                     zip(*trajectory[aid]))[2]]
                 values[aid][k].append(ops.to_torch(
-                    [target_value[aid][k]]))
+                    [target_value[aid][k]]))    #마지막에 텐서 하나 붙이는데 무슨 목적인지 궁금하긴 하다. -> 아 타겟 벨류긴 하다. 근데 왜 굳이?
                 values[aid][k].reverse()
 
         return trajectory, values, target_value, done
@@ -174,7 +174,7 @@ class Worker(mp.Process):
                     pls, vls, els = [], [], []
                     for i, (pi_logit, action, value, reward, comm_ae_loss
                             ) in enumerate(traj):
-                        comm_ae_losses.append(comm_ae_loss.item())
+                        comm_ae_losses.append(comm_ae_loss.item())  #텐서 변수에서 값만 가져오기!
 
                         # Agent A3C Loss
                         t_value = reward[agent] + self.gamma * t_value
@@ -183,15 +183,15 @@ class Worker(mp.Process):
                         # Generalized advantage estimation (GAE)
                         delta_t = reward[agent] + \
                                   self.gamma * val[agent][i].data - \
-                                  val[agent][i + 1].data
-                        gae = gae * self.gamma * self.tau + delta_t
+                                  val[agent][i + 1].data    # .data는 텐서의 데이터만 가져오는 것 같다. 그냥 값을 복사해온 것이라고 생각한다. 여기서 그냥 웃긴게 reverse를 했으니까 i와 i+1을 쓴거다. 원래는 i+1과 -여야 한다.
+                        gae = gae * self.gamma * self.tau + delta_t #sigma GAE 그 식을 이렇게 표현한 것이다. 점화식 형태로. SSo Good
 
                         tl, (pl, vl, el) = policy_gradient_loss(
                             pi_logit[agent], action[agent], advantage, gae=gae)
 
-                        pls.append(ops.to_numpy(pl))
-                        vls.append(ops.to_numpy(vl))
-                        els.append(ops.to_numpy(el))
+                        pls.append(ops.to_numpy(pl))    #policy loss
+                        vls.append(ops.to_numpy(vl))    #value loss
+                        els.append(ops.to_numpy(el))    #entropy
 
                         reward_log += reward[agent]
                         loss += (tl + comm_ae_loss * self.ae_loss_k)
@@ -222,9 +222,6 @@ class Worker(mp.Process):
                 for k, v in log_dict.items():
                     self.master.writer.add_scalar(k, v, weight_iter)
 
-            # local_end = time.time()
-            # local_consumed_time_ = local_end - local_start
-            # local_consumed_time = str(datetime.timedelta(seconds=local_consumed_time_)).split(".")
             now = str(datetime.datetime.now()).split(".")
             # all_pls, all_vls, all_els shape == (num_acts, num_agents)
             progress_str = self.pfmt.format(

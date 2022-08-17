@@ -51,7 +51,7 @@ def to_torch(x, use_gpu=True, dtype=np.float32):
 def to_numpy(x):
     if isinstance(x, int) or isinstance(x, float):
         return x
-    if isinstance(x, (list, np.ndarray)):
+    if isinstance(x, (list, np.ndarray)):           # 이것도 아니고 위에 것도 아니라는 듯.
         return np.array([to_numpy(_x) for _x in x])
     return x.detach().cpu().numpy()
 

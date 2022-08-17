@@ -8,8 +8,8 @@ class DictObservationNormalizationWrapper(gym.Wrapper):
         super().__init__(env)
         return
 
-    def step(self, action):
-        obs_dict, rew_dict, done_dict, info_dict = self.env.step(action)
+    def step(self, action): #여긴 어디일까요 
+        obs_dict, rew_dict, done_dict, info_dict = self.env.step(action)    #에이전트 3개의 액션이 전부 들어간 놀라운 상황입니다.
         for k, v in obs_dict.items():
             if k == 'global':
                 continue

@@ -6,6 +6,7 @@ from __future__ import unicode_literals
 import torch
 import torch.nn.functional as F
 import numpy as np
+import ops
 
 
 def kld_loss(mu, var):
@@ -18,7 +19,7 @@ def kld_loss(mu, var):
 def reparamterize(mu_var, use_gpu=False):
     vae_dim = int(mu_var.size()[1] / 2)
     mu, var = mu_var[:, :vae_dim], mu_var[:, vae_dim:]
-    eps = to_torch(torch.randn(mu.size()), use_gpu=use_gpu)
+    eps = ops.to_torch(torch.randn(mu.size()), use_gpu=use_gpu)
     z = mu + eps * torch.exp(var / 2)  # var -> std
     return z, mu, var
 
@@ -26,20 +27,20 @@ def reparamterize(mu_var, use_gpu=False):
 def discrete_policy_gradient_loss(policy_logit, action, advantage, gae=False,
                                   value_weight=0.5, entropy_weight=0.01):
     policy = F.softmax(policy_logit, dim=-1)[0]
-    log_policy = F.log_softmax(policy_logit, dim=-1)[0]
+    log_policy = F.log_softmax(policy_logit, dim=-1)[0] #추후 엔트로피 구하려고 ㅋㅋ
     log_policy_action = log_policy[action]
 
     if gae is not False and gae is not None:
-        policy_loss = -log_policy_action * gae[0].detach()
+        policy_loss = -log_policy_action * gae[0].detach()  #gae가 텐서긴 하다.
     else:
         policy_loss = -log_policy_action * advantage[0]
 
-    value_loss = advantage ** 2
-    entropy = - (policy * log_policy).sum()
+    value_loss = advantage ** 2 #이거 MSE로 유추됩니다. critic 업데이트를 위한
+    entropy = - (policy * log_policy).sum() #이거 엔트로피의 정의입니다
 
     loss = policy_loss + \
            value_weight * value_loss - \
-           entropy_weight * entropy
+           entropy_weight * entropy #이거 네트워크 업데이트할 때 한 방에 끝내기 위해서 policy네트워크, value네트워크에 의한 로스값을 더해버린 것이다.
 
     return loss, policy_loss, value_loss, entropy
 
