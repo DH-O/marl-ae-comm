@@ -16,9 +16,9 @@ class GridAgentInterface(GridAgent):
         left = 2  # Move left
         up = 3  # Move up
         done = 4  # Done completing task / Stay
-        toggle = 5  # Toggle/activate an object
-        pickup = 6  # Pick up an object
-        drop = 7  # Drop an object
+        # toggle = 5  # Toggle/activate an object   #토글을 없앴다.
+        pickup = 5  # Pick up an object
+        drop = 6  # Drop an object
 
     class skills(IntEnum):
         none = 0
@@ -87,7 +87,7 @@ class GridAgentInterface(GridAgent):
         if self.restrict_actions:
             env_act_dim = 5
         else:
-            env_act_dim = 6
+            env_act_dim = 7 #토글 빼고 상하좌우+스테이+픽업드랍
 
         if comm_dim > 0 and comm_len > 0:
             self.observe_comm = True

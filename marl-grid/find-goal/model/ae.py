@@ -9,6 +9,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import matplotlib.pyplot as plt #plt 추가했다. obs 출력용
+
 from model.a3c_template import A3CTemplate, take_action, take_comm_action
 from model.init import normalized_columns_initializer, weights_init
 from model.model_utils import LSTMhead, ImgModule
@@ -58,7 +60,7 @@ class InputProcessor(nn.Module):
                     'MultiDiscrete':
                 # process position with one-hot encoder
                 self.discrete_positions = obs_space.spaces['selfpos'].nvec
-                state_feat_dim += sum(self.discrete_positions)
+                state_feat_dim += sum(self.discrete_positions)  # 여기서 30이 나온 것이다. 
             else:
                 state_feat_dim += 2
 
@@ -74,22 +76,25 @@ class InputProcessor(nn.Module):
         self.img_layer_norm = nn.LayerNorm(last_fc_dim)
 
         # all other agents' decoded features, if provided
-        self.comm_feat_dim = comm_feat_len * (num_agents - 1)
-        feat_dim += self.comm_feat_dim
+        self.comm_feat_dim = comm_feat_len * (num_agents - 1)   # comm_feat_len이 128이나 된다고 합니다. 초기 설정 때
+        feat_dim += self.comm_feat_dim  # feat_dim는 
 
         self.feat_dim = feat_dim
 
-    def forward(self, inputs, comm=None):
+    def forward(self, inputs, comm=None):   # comm이 없을 땐 이미지 인코더, 있을 땐 두 개를 섞어버리는 인코더가 되는 것 같다.
         # WARNING: the following code only works for Python 3.6 and beyond
 
         # process images together if provided
         if 'pov' in self.obs_keys:
             pov = []
             for i in range(self.num_agents):
-                pov.append(inputs[f'agent_{i}']['pov'])
-            x = torch.cat(pov, dim=0)
-            x = self.conv(x)  # (N, img_feat_dim)
-            xs = torch.chunk(x, self.num_agents)
+                pov.append(inputs[f'agent_{i}']['pov']) # 각각의 1,3,42,42사이즈의 pov를 수집하고 이를 합쳤다.
+                # pov_to_cpuNum = pov[i].to('cpu').detach().numpy()
+                # pov_to_img = np.transpose(pov_to_cpuNum[0],(1,2,0))
+                # plt.imsave(f'pov_to_img_agent{i}.jpeg', pov_to_img/255.)
+            x = torch.cat(pov, dim=0)   #합친 것들을 텐서상으로도 콘캩하는 코드.
+            x = self.conv(x)  # (N, img_feat_dim)   3,64의 결과가 나왔다.
+            xs = torch.chunk(x, self.num_agents)    # 3개로 또 쪼갠다. 각각 1,64 차원이다.
 
         # concatenate observation features
         cat_feat = [self.img_layer_norm(xs[i]) for i in range(self.num_agents)]
@@ -107,7 +112,7 @@ class InputProcessor(nn.Module):
             feats = []
 
             # concat last env act if provided
-            if 'self_env_act' in self.obs_keys:
+            if 'self_env_act' in self.obs_keys: # 이거 보통 false인 것 같다
                 env_act = F.one_hot(
                     inputs[f'agent_{i}']['self_env_act'].to(torch.int64),
                     num_classes=self.env_act_dim)
@@ -116,28 +121,28 @@ class InputProcessor(nn.Module):
 
             # concat agent's own position if provided
             if 'selfpos' in self.obs_keys:
-                sp = inputs[f'agent_{i}']['selfpos'].to(torch.int64)  # (2,)
+                sp = inputs[f'agent_{i}']['selfpos'].to(torch.int64)  # (2,)    # 좌표 포지션이 아웃풋으로 나온다.
                 if self.discrete_positions is not None:
                     spx = F.one_hot(sp[0],
-                                    num_classes=self.discrete_positions[0])
+                                    num_classes=self.discrete_positions[0]) # self.discrete_positions[0]이 15,15 좌표계에서 좌표계를 꺼내온거고 그 상에서 sp의 x좌표 값을 원핫으로 바꿨다.
                     spy = F.one_hot(sp[1],
                                     num_classes=self.discrete_positions[1])
                     sp = torch.cat([spx, spy], dim=-1).float()
-                    sp = torch.reshape(sp, (1, sum(self.discrete_positions)))
+                    sp = torch.reshape(sp, (1, sum(self.discrete_positions))) # sp.shape = [1,30]이다
                 else:
                     sp = torch.reshape(sp, (1, 2))
-                feats.append(sp)
+                feats.append(sp)    # feats[0].shape == torch.Size([1,30])
 
             if len(feats) > 1:
                 feats = torch.cat(feats, dim=-1)
             elif len(feats) == 1:
-                feats = feats[0]
+                feats = feats[0]    #feats가 리스트였는데 tensor로 바뀌게 되었다.
             else:
                 raise ValueError('?!?!?!', feats)
 
-            feats = self.state_feat_fc(feats)
-            feats = self.state_layer_norm(feats)
-            cat_feat[i] = torch.cat([cat_feat[i], feats], dim=-1)
+            feats = self.state_feat_fc(feats)   # 어 이제 1,64 텐서로 바뀌었다.
+            feats = self.state_layer_norm(feats)    # [1,64]
+            cat_feat[i] = torch.cat([cat_feat[i], feats], dim=-1)   # [1,128]로 바뀐다. pov랑 selfpos랑 합친 것 같다. 신기한게 1,128이 된다는 것?
 
             if comm is not None:
                 # concat comm features for each agent
@@ -283,7 +288,94 @@ class EncoderDecoder(nn.Module):
         else:
             raise NotImplementedError
 
+############################################################
+class MultiHeadAttention(nn.Module):
+    
+    def __init__(self, model_dimension, heads_number):
+        super(MultiHeadAttention, self).__init__()
+        self.heads_number = heads_number    # 64를 넣긴 했는데
+        self.attention = ScaleDotProductAttention()
+        self.W_Q = nn.Linear(model_dimension, model_dimension)
+        self.W_K = nn.Linear(model_dimension, model_dimension)
+        self.W_V = nn.Linear(model_dimension, model_dimension)
+        self.w_concat = nn.Linear(model_dimension, model_dimension)
+    
+    def forward(self, q, k, v, mask=None):
+        # 1. dot product with weight metrices
+        q, k, v = self.W_Q(q), self.W_K(k), self.W_V(v)
+        
+        # # 2. split tensor by number of heads
+        # q, k, v = self.split(q), self.split(k), self.split(v)
+        
+        # 3. do scale dot product to compute similarity
+        out, attention = self.attention(q, k, v, mask=mask)
+        
+        # 4. concat and pass to linear layer
+        # out = self.concat(out)
+        # out = self.w_concat(out)
+        
+        return out
+        
+    # def split(self, tensor):    #tensor가 2,10이 나오긴한다.
+    #     """
+    #     split tensor by number of head
 
+    #     :param tensor: [batch_size, length, model_dimension
+    #     :return: [batch_size, head, length, tensor_dimension]
+    #     """
+    #     batch_size, length, model_dimension = tensor.size() #Tensor.shape나 size나 기능은 비슷비슷하다.
+    #     tensor_dimension = model_dimension // self.heads_number
+    #     tensor = tensor.reshape(batch_size, length, self.heads_number, tensor_dimension).transpose(1,2)
+    #     # it is similar with group convolution (split by nymber of heads)
+        
+    #     return tensor
+    
+    # def concat(self, tensor):
+    #     """
+    #     inverse function of self.split(tensor : torch.Tensor)
+        
+    #     :param tensor: [batch_size, head, length, d_tensor]
+    #     :return: [batch_size, length, d_model]
+    #     """
+    #     batch_size, head, length, d_tensor = tensor.size()
+    #     d_model = head * d_tensor
+        
+    #     tensor = tensor.transpose(1,2).contiguous().view(batch_size, length, d_model)
+    #     return tensor
+        
+class ScaleDotProductAttention(nn.Module):
+    """
+    compute scale dot product attention
+    
+    Query   : given action that we focused on (decoder)
+    Key     : an image to check relationship with Query (encoder)
+    """
+    def __init__(self):
+        super(ScaleDotProductAttention, self).__init__()
+        self.softmax = nn.Softmax(dim=-1)
+        
+    def forward(self, q, k, v, mask=None, e=1e-12):
+        # input is 4 dimension tensor?
+        # [batch_size, head, length , d_tensor]
+        # batch_size, head, 
+        length, d_tensor = k.size()
+        
+        # 1. dot product Query with key^T to compute similarity
+        k_t = k.transpose(0,1) # transpose
+        score = (q @ k_t) / math.sqrt(d_tensor) # scaled dot product
+        
+        # # 2. applying masking (opt)
+        # if mask is None:
+        #     score = score.masked_fill(mask == 0, -e)
+            
+        # 3. pass them softmax to make [0,1] range
+        score = self.softmax(score)
+        
+        # 4. multiply with Value
+        v = score @ v
+        
+        return v, score
+#################################
 class AENetwork(A3CTemplate):
     """
     An network with AE comm.
@@ -305,11 +397,21 @@ class AENetwork(A3CTemplate):
                                       img_feat_dim=img_feat_dim)
 
         feat_dim = self.comm_ae.preprocessor.feat_dim
-
+        
+        ###############################
+        self.multi_head_attention = nn.ModuleList(
+            [MultiHeadAttention(comm_len, 64
+                      ) for _ in range(num_agents)])
+        
+        self.act_feat_fc = nn.ModuleList(
+            [nn.Linear(self.action_size, comm_len
+                       ) for _ in range(num_agents)])
+        ##################################
+        
         if ae_type == '':
             self.input_processor = InputProcessor(
                 obs_space,
-                feat_dim,
+                feat_dim,   # 아래랑 위랑 두번째 줄만 다르다. 
                 num_agents,
                 last_fc_dim=img_feat_dim)
         else:
@@ -375,18 +477,36 @@ class AENetwork(A3CTemplate):
         # (1) pre-process inputs
         comm_feat = []
         for i in range(self.num_agents):
-            cf = self.comm_ae.decode(inputs[f'agent_{i}']['comm'][:-1])
+            #########################
+            if inputs[f'agent_{i}']['past_action'] is not None:
+                else_action_list = list(range(self.num_agents))
+                del else_action_list[i]
+                act_feat = []
+                for j in else_action_list:
+                    act_hot = F.one_hot(inputs[f'agent_{j}']['past_action'], num_classes=self.action_size)
+                    act_feat.append(self.act_feat_fc[j](act_hot.float())) # act_feat은 1,10의 텐서다.
+                    if len(act_feat) == 1:
+                        act_feat_tensor = act_feat[0]
+                    else:
+                        act_feat_tensor = torch.stack((act_feat_tensor, act_feat[-1]), dim=0)
+                
+                attention_value = self.multi_head_attention[i](inputs[f'agent_{i}']['comm'][:-1], act_feat_tensor, inputs[f'agent_{i}']['comm'][:-1])
+                cf = self.comm_ae.decode(attention_value)
+            else:
+            ###############################
+                cf = self.comm_ae.decode(inputs[f'agent_{i}']['comm'][:-1]) # 메세지 인코더 돌린 것 같다. 근데 한 줄을 뺐다
+            
             if not self.ae_pg:
                 cf = cf.detach()
             comm_feat.append(cf)
 
-        cat_feat = self.input_processor(inputs, comm_feat)
+        cat_feat = self.input_processor(inputs, comm_feat)  # 384까지 뻥튀기가 되기도 한다. 우선 comm_feat는 총 3개 있고, 각각 2,128 차원이다.
 
         # (2) generate AE comm output and reconstruction loss
         with torch.no_grad():
             x = self.input_processor(inputs)
         x = torch.cat(x, dim=0)
-        comm_out, comm_ae_loss = self.comm_ae(x)
+        comm_out, comm_ae_loss = self.comm_ae(x)    #comm_out이 c_t인 것 같다. x.shape하면 3,128나온다. comm_out은 3,10이다.
 
         # (3) predict policy and values separately
         env_actor_out, env_critic_out = {}, {}
@@ -396,9 +516,9 @@ class AENetwork(A3CTemplate):
                 continue
 
             cat_feat[i] = torch.cat([cat_feat[i], comm_out[i].unsqueeze(0)],
-                                    dim=-1)
+                                    dim=-1) # cat_feat[i] == 1,384 comm_out[i].unsqueeze == 1,10
 
-            x, hidden_state[i] = self.head[i](cat_feat[i], hidden_state[i])
+            x, hidden_state[i] = self.head[i](cat_feat[i], hidden_state[i]) #LSTM head에 두 인수를 넣는다.  여기서 hidden_state[:][:].shape == [1,1,256]    cat_feat[i].unsqueeze(0)
 
             env_actor_out[agent_name] = self.env_actor_linear[i](x)
             env_critic_out[agent_name] = self.env_critic_linear[i](x)

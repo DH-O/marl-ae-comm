@@ -17,7 +17,6 @@ from util import ops
 from util.misc import check_done
 from util.decorator import within_cuda_device
 
-
 class Worker(mp.Process):
     """
     A3C worker. Each worker is responsible for collecting data from the
@@ -56,6 +55,7 @@ class Worker(mp.Process):
         self.agents = [f'agent_{i}' for i in range(self.env.num_agents)]
         self.num_acts = 1
         self.ae_loss_k = ae_loss_k
+        self.past_action_length = 1
 
     @within_cuda_device
     def get_trajectory(self, hidden_state, state_var, done):
@@ -80,12 +80,33 @@ class Worker(mp.Process):
         trajectory = [[] for _ in range(self.num_acts)]
 
         while not check_done(done) and len(trajectory[0]) < self.t_max:
+            ##################################    
+            if len(trajectory[0]) < self.past_action_length:
+                plogit, value, hidden_state, comm_out, comm_ae_loss = self.net(
+                    state_var, hidden_state, env_mask_idx=env_mask_idx) #inputs가 state_var이다. 
+                action, _, _, all_actions = self.net.take_action(plogit, comm_out)
+                state, reward, done, info = self.env.step(all_actions)
+                state_var = ops.to_state_var(state)
+                
+                # assert self.num_acts == 1:
+                trajectory[0].append((plogit, action, value, reward, comm_ae_loss))
+
+                # mask unavailable env actions after individual done
+                for agent_id, a in enumerate(self.agents):
+                    if info[a]['done'] and env_mask_idx[agent_id] is None:
+                        env_mask_idx[agent_id] = [0, 1, 2, 3]
+
+            past_action = trajectory[0][len(trajectory)-1][1]
+            for k in range(self.env.num_agents):
+                state_var[f'agent_{k}']['past_action'] = torch.tensor(past_action.get(f'agent_{k}')).cuda()
+            #############################################
+            
             plogit, value, hidden_state, comm_out, comm_ae_loss = self.net(
-                state_var, hidden_state, env_mask_idx=env_mask_idx)
+            state_var, hidden_state, env_mask_idx=env_mask_idx) #inputs가 state_var이다. 
             action, _, _, all_actions = self.net.take_action(plogit, comm_out)
             state, reward, done, info = self.env.step(all_actions)
             state_var = ops.to_state_var(state)
-
+                
             # assert self.num_acts == 1:
             trajectory[0].append((plogit, action, value, reward, comm_ae_loss))
 
@@ -93,6 +114,7 @@ class Worker(mp.Process):
             for agent_id, a in enumerate(self.agents):
                 if info[a]['done'] and env_mask_idx[agent_id] is None:
                     env_mask_idx[agent_id] = [0, 1, 2, 3]
+            ######################
 
         # end condition
         if check_done(done):

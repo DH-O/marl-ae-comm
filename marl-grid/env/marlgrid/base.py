@@ -530,7 +530,7 @@ class MultiGridEnv(gym.Env):
                 comm.append(a.comm)
         comm.append(agent.comm)
 
-        comm = np.stack(comm, axis=0)  # (num_agents, comm_len)
+        comm = np.stack(comm, axis=0)  # (num_agents, comm_len) 이를 통해 리스트에서 ndarray로 바뀌었다.
         return comm
 
     def gen_agent_done_obs(self, agent):
@@ -600,6 +600,9 @@ class MultiGridEnv(gym.Env):
                 ret['identity'] = agent.is_adversary
             if agent.observe_comm:
                 ret['comm'] = self.gen_agent_comm_obs(agent)
+            ######
+            ret['past_action'] = None
+            ######                
             return ret
         elif agent.observation_style == 'tuple':
             ret = (grid_image,)
@@ -761,12 +764,12 @@ class MultiGridEnv(gym.Env):
                     else:
                         pass
 
-                # Toggle/activate an object
-                elif action == agent.actions.toggle:
-                    if fwd_cell:
-                        fwd_cell.toggle(agent, fwd_pos)
-                    else:
-                        pass
+                # # Toggle/activate an object
+                # elif action == agent.actions.toggle:
+                #     if fwd_cell:
+                #         fwd_cell.toggle(agent, fwd_pos)
+                #     else:
+                #         pass
 
                 # Done action (same as "do nothing")
                 elif action == agent.actions.done:
