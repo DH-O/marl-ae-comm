@@ -96,9 +96,8 @@ class Worker(mp.Process):
                     if info[a]['done'] and env_mask_idx[agent_id] is None:
                         env_mask_idx[agent_id] = [0, 1, 2, 3]
 
-            past_action = trajectory[0][len(trajectory)-1][1]
             for k in range(self.env.num_agents):
-                state_var[f'agent_{k}']['past_action'] = torch.tensor(past_action.get(f'agent_{k}')).cuda()
+                state_var[f'agent_{k}']['past_action'] = torch.tensor(action.get(f'agent_{k}')).cuda()
             #############################################
             
             plogit, value, hidden_state, comm_out, comm_ae_loss = self.net(

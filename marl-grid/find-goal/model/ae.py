@@ -76,7 +76,7 @@ class InputProcessor(nn.Module):
         self.img_layer_norm = nn.LayerNorm(last_fc_dim)
 
         # all other agents' decoded features, if provided
-        self.comm_feat_dim = comm_feat_len * (num_agents - 1)   # comm_feat_len이 128이나 된다고 합니다. 초기 설정 때
+        self.comm_feat_dim = comm_feat_len * 2 * (num_agents - 1)   # comm_feat_len이 128이나 된다고 합니다. 지금 message encoder에 어텐션된 값이랑 기본 값 둘 다 넣기 때문에 곱하기 2를 써줬다.
         feat_dim += self.comm_feat_dim  # feat_dim는 
 
         self.feat_dim = feat_dim
@@ -146,7 +146,8 @@ class InputProcessor(nn.Module):
 
             if comm is not None:
                 # concat comm features for each agent
-                c = torch.reshape(comm[i], (1, self.comm_feat_dim))
+                # if comm[i].shape[0] == 2:
+                c = torch.reshape(comm[i], (1, self.comm_feat_dim)) # 1, 512 으로 reshape 왜냐면 self.comm_feat_dim 자체가 이미 두 배 뻥튀기로 변환되어 있다.
                 cat_feat[i] = torch.cat([cat_feat[i], c], dim=-1)
 
         return cat_feat
@@ -298,51 +299,15 @@ class MultiHeadAttention(nn.Module):
         self.W_Q = nn.Linear(model_dimension, model_dimension)
         self.W_K = nn.Linear(model_dimension, model_dimension)
         self.W_V = nn.Linear(model_dimension, model_dimension)
-        self.w_concat = nn.Linear(model_dimension, model_dimension)
     
     def forward(self, q, k, v, mask=None):
         # 1. dot product with weight metrices
         q, k, v = self.W_Q(q), self.W_K(k), self.W_V(v)
         
-        # # 2. split tensor by number of heads
-        # q, k, v = self.split(q), self.split(k), self.split(v)
-        
         # 3. do scale dot product to compute similarity
         out, attention = self.attention(q, k, v, mask=mask)
         
-        # 4. concat and pass to linear layer
-        # out = self.concat(out)
-        # out = self.w_concat(out)
-        
         return out
-        
-    # def split(self, tensor):    #tensor가 2,10이 나오긴한다.
-    #     """
-    #     split tensor by number of head
-
-    #     :param tensor: [batch_size, length, model_dimension
-    #     :return: [batch_size, head, length, tensor_dimension]
-    #     """
-    #     batch_size, length, model_dimension = tensor.size() #Tensor.shape나 size나 기능은 비슷비슷하다.
-    #     tensor_dimension = model_dimension // self.heads_number
-    #     tensor = tensor.reshape(batch_size, length, self.heads_number, tensor_dimension).transpose(1,2)
-    #     # it is similar with group convolution (split by nymber of heads)
-        
-    #     return tensor
-    
-    # def concat(self, tensor):
-    #     """
-    #     inverse function of self.split(tensor : torch.Tensor)
-        
-    #     :param tensor: [batch_size, head, length, d_tensor]
-    #     :return: [batch_size, length, d_model]
-    #     """
-    #     batch_size, head, length, d_tensor = tensor.size()
-    #     d_model = head * d_tensor
-        
-    #     tensor = tensor.transpose(1,2).contiguous().view(batch_size, length, d_model)
-    #     return tensor
-        
 class ScaleDotProductAttention(nn.Module):
     """
     compute scale dot product attention
@@ -363,15 +328,11 @@ class ScaleDotProductAttention(nn.Module):
         # 1. dot product Query with key^T to compute similarity
         k_t = k.transpose(0,1) # transpose
         score = (q @ k_t) / math.sqrt(d_tensor) # scaled dot product
-        
-        # # 2. applying masking (opt)
-        # if mask is None:
-        #     score = score.masked_fill(mask == 0, -e)
             
-        # 3. pass them softmax to make [0,1] range
+        # 2. pass them softmax to make [0,1] range
         score = self.softmax(score)
         
-        # 4. multiply with Value
+        # 3. multiply with Value
         v = score @ v
         
         return v, score
@@ -399,13 +360,16 @@ class AENetwork(A3CTemplate):
         feat_dim = self.comm_ae.preprocessor.feat_dim
         
         ###############################
-        self.multi_head_attention = nn.ModuleList(
-            [MultiHeadAttention(comm_len, 64
-                      ) for _ in range(num_agents)])
+        # self.multi_head_attention = nn.ModuleList(
+        #     [MultiHeadAttention(comm_len, 64
+        #               ) for _ in range(num_agents)])
         
-        self.act_feat_fc = nn.ModuleList(
-            [nn.Linear(self.action_size, comm_len
-                       ) for _ in range(num_agents)])
+        # self.act_feat_fc = nn.ModuleList(
+        #     [nn.Linear(self.action_size, comm_len
+        #                ) for _ in range(num_agents)])
+        
+        self.multi_head_attention = MultiHeadAttention(comm_len, 64)
+        self.act_feat_fc = nn.Linear(self.action_size, comm_len)
         ##################################
         
         if ae_type == '':
@@ -477,30 +441,34 @@ class AENetwork(A3CTemplate):
         # (1) pre-process inputs
         comm_feat = []
         for i in range(self.num_agents):
-            #########################
+            ########################
             if inputs[f'agent_{i}']['past_action'] is not None:
                 else_action_list = list(range(self.num_agents))
                 del else_action_list[i]
                 act_feat = []
                 for j in else_action_list:
                     act_hot = F.one_hot(inputs[f'agent_{j}']['past_action'], num_classes=self.action_size)
-                    act_feat.append(self.act_feat_fc[j](act_hot.float())) # act_feat은 1,10의 텐서다.
+                    act_feat.append(self.act_feat_fc(act_hot.float())) # act_feat은 1,10의 텐서다.
                     if len(act_feat) == 1:
                         act_feat_tensor = act_feat[0]
                     else:
                         act_feat_tensor = torch.stack((act_feat_tensor, act_feat[-1]), dim=0)
-                
-                attention_value = self.multi_head_attention[i](inputs[f'agent_{i}']['comm'][:-1], act_feat_tensor, inputs[f'agent_{i}']['comm'][:-1])
-                cf = self.comm_ae.decode(attention_value)
+                attention_value = self.multi_head_attention(inputs[f'agent_{i}']['comm'][:-1], inputs[f'agent_{i}']['comm'][:-1], inputs[f'agent_{i}']['comm'][:-1])
+                cf_attended = self.comm_ae.decode(attention_value)
+                cf_naive = self.comm_ae.decode(inputs[f'agent_{i}']['comm'][:-1])
+                cf = torch.cat((cf_attended, cf_naive),dim=0)
             else:
             ###############################
-                cf = self.comm_ae.decode(inputs[f'agent_{i}']['comm'][:-1]) # 메세지 인코더 돌린 것 같다. 근데 한 줄을 뺐다
+                # cf = self.comm_ae.decode(inputs[f'agent_{i}']['comm'][:-1]) # 메세지 인코더 돌린 것 같다. 근데 한 줄을 뺐다
+                cf_naive = self.comm_ae.decode(inputs[f'agent_{i}']['comm'][:-1])
+                cf = torch.cat((cf_naive, cf_naive),dim=0)
+                
             
             if not self.ae_pg:
                 cf = cf.detach()
             comm_feat.append(cf)
 
-        cat_feat = self.input_processor(inputs, comm_feat)  # 384까지 뻥튀기가 되기도 한다. 우선 comm_feat는 총 3개 있고, 각각 2,128 차원이다.
+        cat_feat = self.input_processor(inputs, comm_feat)  # 384까지 뻥튀기가 되기도 한다. 우선 comm_feat는 총 3개 있고, 각각 2,128 차원이다.  #그러니까 이미지 피쳐랑 comm 피쳐 다 합친거다.
 
         # (2) generate AE comm output and reconstruction loss
         with torch.no_grad():
