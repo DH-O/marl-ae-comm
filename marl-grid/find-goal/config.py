@@ -33,7 +33,7 @@ def get_env_cfg():
     config.observe_self_env_act = False
     config.observe_t = False
     config.observe_done = False
-    config.neutral_shape = False    # 에이전트를 삼각형으로 만든다.
+    config.neutral_shape = True
     config.can_overlap = False
     config.active_after_done = False
 

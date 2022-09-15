@@ -96,13 +96,12 @@ class Worker(mp.Process):
                     if info[a]['done'] and env_mask_idx[agent_id] is None:
                         env_mask_idx[agent_id] = [0, 1, 2, 3]
 
-            past_action = trajectory[0][len(trajectory)-1][1]
             for k in range(self.env.num_agents):
-                state_var[f'agent_{k}']['past_action'] = torch.tensor(past_action.get(f'agent_{k}')).cuda()
+                state_var[f'agent_{k}']['past_action'] = torch.tensor(action.get(f'agent_{k}')).cuda()
             #############################################
             
             plogit, value, hidden_state, comm_out, comm_ae_loss = self.net(
-            state_var, hidden_state, env_mask_idx=env_mask_idx) #inputs가 state_var이다. 
+                state_var, hidden_state, env_mask_idx=env_mask_idx)
             action, _, _, all_actions = self.net.take_action(plogit, comm_out)
             state, reward, done, info = self.env.step(all_actions)
             state_var = ops.to_state_var(state)
@@ -114,7 +113,6 @@ class Worker(mp.Process):
             for agent_id, a in enumerate(self.agents):
                 if info[a]['done'] and env_mask_idx[agent_id] is None:
                     env_mask_idx[agent_id] = [0, 1, 2, 3]
-            ######################
 
         # end condition
         if check_done(done):

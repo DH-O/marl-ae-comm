@@ -35,7 +35,7 @@ class InputProcessor(nn.Module):
         - self_env_act
         - selfpos
     """
-    def __init__(self, obs_space, comm_feat_len, num_agents, last_fc_dim=64):
+    def __init__(self, obs_space, comm_feat_len, num_agents, last_fc_dim=64, act_dim=5):
         super(InputProcessor, self).__init__()
 
         self.obs_keys = list(obs_space.spaces.keys())
@@ -43,7 +43,7 @@ class InputProcessor(nn.Module):
 
         # image processor
         assert 'pov' in self.obs_keys
-        self.conv = ImgModule(obs_space['pov'].shape, last_fc_dim=last_fc_dim)
+        self.conv = ImgModule(obs_space['pov'].shape, last_fc_dim=last_fc_dim, act_dim=act_dim)
         feat_dim = last_fc_dim
 
         # state inputs processor
@@ -93,7 +93,7 @@ class InputProcessor(nn.Module):
                 # pov_to_img = np.transpose(pov_to_cpuNum[0],(1,2,0))
                 # plt.imsave(f'pov_to_img_agent{i}.jpeg', pov_to_img/255.)
             x = torch.cat(pov, dim=0)   #합친 것들을 텐서상으로도 콘캩하는 코드.
-            x = self.conv(x)  # (N, img_feat_dim)   3,64의 결과가 나왔다.
+            x = self.conv(x, inputs)  # (N, img_feat_dim)   3,64의 결과가 나왔다.
             xs = torch.chunk(x, self.num_agents)    # 3개로 또 쪼갠다. 각각 1,64 차원이다.
 
         # concatenate observation features
@@ -154,11 +154,11 @@ class InputProcessor(nn.Module):
 
 class EncoderDecoder(nn.Module):
     def __init__(self, obs_space, comm_len, discrete_comm, num_agents,
-                 ae_type='', img_feat_dim=64):
+                 ae_type='', img_feat_dim=64, act_dim=5):
         super(EncoderDecoder, self).__init__()
 
         self.preprocessor = InputProcessor(obs_space, 0, num_agents,
-                                           last_fc_dim=img_feat_dim)
+                                           last_fc_dim=img_feat_dim, act_dim=act_dim)
         in_size = self.preprocessor.feat_dim
 
         if ae_type == 'rfc':
@@ -223,7 +223,7 @@ class EncoderDecoder(nn.Module):
                 nn.ReLU(),
                 nn.Linear(128, in_size),
             )
-        elif ae_type == '':
+        elif ae_type == '': # 이거 한거번에 계산되는 것 같은데 에이전트 3개에 대해서? 놀랍게도 in_size는 128이다. 
             # AE
             self.encoder = nn.Sequential(
                 nn.Linear(in_size, 128),
@@ -235,7 +235,7 @@ class EncoderDecoder(nn.Module):
                 nn.Linear(32, comm_len),
                 nn.Sigmoid()
             )
-            self.decoder = nn.Sequential(
+            self.decoder = nn.Sequential(   # 이거 원래 첫번째 숫자는 배치사이즈로 취급을 한다.
                 nn.Linear(comm_len, 32),
                 nn.ReLU(),
                 nn.Linear(32, 64),
@@ -394,18 +394,20 @@ class AENetwork(A3CTemplate):
 
         self.comm_ae = EncoderDecoder(obs_space, comm_len, discrete_comm,
                                       num_agents, ae_type=ae_type,
-                                      img_feat_dim=img_feat_dim)
+                                      img_feat_dim=img_feat_dim, act_dim=self.action_size)
 
         feat_dim = self.comm_ae.preprocessor.feat_dim
         
         ###############################
-        self.multi_head_attention = nn.ModuleList(
-            [MultiHeadAttention(comm_len, 64
-                      ) for _ in range(num_agents)])
+        # self.multi_head_attention = nn.ModuleList(
+        #     [MultiHeadAttention(comm_len, 64
+        #               ) for _ in range(num_agents)])
         
-        self.act_feat_fc = nn.ModuleList(
-            [nn.Linear(self.action_size, comm_len
-                       ) for _ in range(num_agents)])
+        # self.act_feat_fc = nn.ModuleList(
+        #     [nn.Linear(self.action_size, comm_len
+        #                ) for _ in range(num_agents)])
+        self.multi_head_attention = MultiHeadAttention(comm_len, 64)
+        self.act_feat_fc = nn.Linear(self.action_size, comm_len)
         ##################################
         
         if ae_type == '':
@@ -413,13 +415,15 @@ class AENetwork(A3CTemplate):
                 obs_space,
                 feat_dim,   # 아래랑 위랑 두번째 줄만 다르다. 
                 num_agents,
-                last_fc_dim=img_feat_dim)
+                last_fc_dim=img_feat_dim,
+                act_dim=self.action_size)
         else:
             self.input_processor = InputProcessor(
                 obs_space,
                 comm_len,
                 num_agents,
-                last_fc_dim=img_feat_dim)
+                last_fc_dim=img_feat_dim,
+                act_dim=self.action_size)
 
         # individual memories
         self.feat_dim = self.input_processor.feat_dim + comm_len
@@ -477,24 +481,23 @@ class AENetwork(A3CTemplate):
         # (1) pre-process inputs
         comm_feat = []
         for i in range(self.num_agents):
-            #########################
-            if inputs[f'agent_{i}']['past_action'] is not None:
-                else_action_list = list(range(self.num_agents))
-                del else_action_list[i]
-                act_feat = []
-                for j in else_action_list:
-                    act_hot = F.one_hot(inputs[f'agent_{j}']['past_action'], num_classes=self.action_size)
-                    act_feat.append(self.act_feat_fc[j](act_hot.float())) # act_feat은 1,10의 텐서다.
-                    if len(act_feat) == 1:
-                        act_feat_tensor = act_feat[0]
-                    else:
-                        act_feat_tensor = torch.stack((act_feat_tensor, act_feat[-1]), dim=0)
-                
-                attention_value = self.multi_head_attention[i](inputs[f'agent_{i}']['comm'][:-1], act_feat_tensor, inputs[f'agent_{i}']['comm'][:-1])
-                cf = self.comm_ae.decode(attention_value)
-            else:
+            ########################
+            # if inputs[f'agent_{i}']['past_action'] is not None:
+            #     else_action_list = list(range(self.num_agents))
+            #     del else_action_list[i]
+            #     act_feat = []
+            #     for j in else_action_list:
+            #         act_hot = F.one_hot(inputs[f'agent_{j}']['past_action'], num_classes=self.action_size)
+            #         act_feat.append(self.act_feat_fc(act_hot.float())) # act_feat은 1,10의 텐서다.
+            #         if len(act_feat) == 1:
+            #             act_feat_tensor = act_feat[0]
+            #         else:
+            #             act_feat_tensor = torch.stack((act_feat_tensor, act_feat[-1]), dim=0)
+            #     attention_value = self.multi_head_attention(inputs[f'agent_{i}']['comm'][:-1], inputs[f'agent_{i}']['comm'][:-1], inputs[f'agent_{i}']['comm'][:-1])
+            #     cf = self.comm_ae.decode(attention_value)
+            # else:
             ###############################
-                cf = self.comm_ae.decode(inputs[f'agent_{i}']['comm'][:-1]) # 메세지 인코더 돌린 것 같다. 근데 한 줄을 뺐다
+            cf = self.comm_ae.decode(inputs[f'agent_{i}']['comm'][:-1]) # 메세지 인코더 돌린 것 같다. 근데 한 줄을 뺐다
             
             if not self.ae_pg:
                 cf = cf.detach()

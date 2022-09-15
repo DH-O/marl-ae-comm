@@ -6,9 +6,56 @@ from __future__ import unicode_literals
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+############
+import math
+#############
 
 from model.init import weights_init
 
+############################################################
+class MultiHeadAttention(nn.Module):
+    
+    def __init__(self, model_dimension):
+        super(MultiHeadAttention, self).__init__()
+        self.attention = ScaleDotProductAttention()
+        self.W_Q = nn.Linear(model_dimension, model_dimension)
+        self.W_K = nn.Linear(model_dimension, model_dimension)
+        self.W_V = nn.Linear(model_dimension, model_dimension)
+    
+    def forward(self, q, k, v, mask=None):
+        # 1. dot product with weight metrices
+        q, k, v = self.W_Q(q), self.W_K(k), self.W_V(v)
+        
+        # 3. do scale dot product to compute similarity
+        out, attention = self.attention(q, k, v, mask=mask)
+        
+        return out
+class ScaleDotProductAttention(nn.Module):
+    """
+    compute scale dot product attention
+    
+    Query   : given action that we focused on (decoder)
+    Key     : an image to check relationship with Query (encoder)
+    """
+    def __init__(self):
+        super(ScaleDotProductAttention, self).__init__()
+        self.softmax = nn.Softmax(dim=-1)
+        
+    def forward(self, q, k, v, mask=None, e=1e-12): 
+        length, d_tensor = k.size()
+        
+        # 1. dot product Query with key^T to compute similarity
+        k_t = k.transpose(0,1) # transpose
+        score = (q @ k_t) / math.sqrt(d_tensor) # scaled dot product
+
+        # 2. pass them softmax to make [0,1] range
+        score = self.softmax(score)
+        
+        # 3. multiply with Value
+        v = score @ v
+        
+        return v, score
+#################################
 
 class LSTMhead(nn.Module):
     def __init__(self, in_dim, out_dim, num_layers=1):
@@ -37,7 +84,7 @@ class LSTMhead(nn.Module):
 
 class ImgModule(nn.Module):
     """Process image inputs of shape CxHxW."""
-    def __init__(self, input_size, last_fc_dim=0):
+    def __init__(self, input_size, last_fc_dim=0, act_dim=5):
         super(ImgModule, self).__init__()
         self.conv1 = self.make_layer(input_size[2], 32)
         self.conv2 = self.make_layer(32, 32)
@@ -49,6 +96,14 @@ class ImgModule(nn.Module):
         else:
             self.fc = None
         self.apply(weights_init)
+        ###########################
+        self.num_agents = 3
+        self.multi_head_attention = MultiHeadAttention(72)
+        self.act_feat_fc = nn.Linear(act_dim, 72)
+        self.emb_img = nn.Linear(288,72)
+        self.decode_atten = nn.Linear(72,288)
+        self.act_dim = act_dim
+        ############################
 
     def make_layer(self, in_ch, out_ch, use_norm=True):
         layer = []
@@ -58,13 +113,26 @@ class ImgModule(nn.Module):
             layer += [nn.InstanceNorm2d(out_ch)]
         return nn.Sequential(*layer)
 
-    def forward(self, inputs):
-        x = self.conv1(inputs)
+    def forward(self, image_inputs, action_inputs):
+        x = self.conv1(image_inputs)
         x = self.conv2(x)
         x = self.conv3(x)
         x = self.conv4(x)
         x = self.avgpool(x)
         x = x.view(-1, 32 * 3 * 3)  # feature dim
+        act_feat_list = []
+        if action_inputs[f'agent_{0}']['past_action'] is not None:
+            x = self.emb_img(x)
+            for i in range(self.num_agents):
+                act_hot = F.one_hot(action_inputs[f'agent_{i}']['past_action'], num_classes=self.act_dim)
+                act_feat = self.act_feat_fc(act_hot.float()).reshape(1,72)
+                act_feat_list.append(act_feat)  # act_feat은 1,72로 뽑아준다.
+                if len(act_feat_list) == 1:
+                    act_feat_tensor = act_feat_list[0]
+                else:
+                    act_feat_tensor = torch.cat((act_feat_tensor, act_feat_list[-1]), dim=0)
+            x = self.multi_head_attention(x, act_feat_tensor, x)
+            x = self.decode_atten(x)
         if self.fc is not None:
             return self.fc(x)
         return x
