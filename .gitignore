@@ -2,3 +2,4 @@ __pycache__
 .DS_Store
 marl-grid/runs/
 marl-grid/find-goal/runs/
+marl-grid/env/marlgrid.egg-info/
