@@ -600,9 +600,9 @@ class MultiGridEnv(gym.Env):
                 ret['identity'] = agent.is_adversary
             if agent.observe_comm:
                 ret['comm'] = self.gen_agent_comm_obs(agent)
-            ######
-            ret['past_action'] = None
-            ######                
+            # ######
+            # ret['past_action'] = None
+            # ######                
             return ret
         elif agent.observation_style == 'tuple':
             ret = (grid_image,)
