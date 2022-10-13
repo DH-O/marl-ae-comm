@@ -139,7 +139,7 @@ class GridAgent(WorldObj):
 
     @property
     def dir(self):
-        return self.state % 4
+        return self.state % 4   #그나저나 이거 왜 단일 정수가 나왔을까
 
     @property
     def type(self):

@@ -78,7 +78,7 @@ class Master(object):
             self._apply_gradients(net)
         return
 
-    def increment(self, progress_str=None):
+    def increment(self, progress_str=None): # 여기서 self.iter 100마다 콘솔에서 쏴주는 것이었다.
         with self.iter.get_lock():
             self.iter.value += 1
 

@@ -350,7 +350,7 @@ class AENetwork(A3CTemplate):
     def init_hidden(self):
         return [head.init_hidden() for head in self.head]   #LSTMhear.init_hidden을 반환함
 
-    def take_action(self, policy_logit, comm_out):
+    def take_action(self, policy_logit, comm_out):  # policy logit에 따라 액션 아웃풋이 나온다 당연하게도.
         act_dict = {}
         act_logp_dict = {}
         ent_list = []

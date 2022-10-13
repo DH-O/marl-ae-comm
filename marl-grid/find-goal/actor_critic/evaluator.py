@@ -74,7 +74,7 @@ class Evaluator(mp.Process):
             weight_iter = self.master.copy_weights(self.net)
 
             log_dict = defaultdict(int)
-            for eval_id in range(self.num_eval_episodes):
+            for eval_id in range(self.num_eval_episodes):   # 디폴트 세팅 값은 10개의 평가 에피소드들이다.
                 env_copy = copy.deepcopy(self.eval_env[eval_id])
 
                 state = env_copy.reset()
@@ -171,7 +171,7 @@ class Evaluator(mp.Process):
                         log_dict['adv_rew'] += np.sum(agent_rewards)
                         log_dict['adv_steps'] += ctime
                     else:
-                        log_dict['nonadv_rew'] += np.sum(agent_rewards)
+                        log_dict['nonadv_rew'] += np.sum(agent_rewards) # 이게 바로 텐서보드에 찍히는 그 리워드들이다. 세상에 1024개나 찍힌다. 왜냐면 그렇게 설정했으니까
                         log_dict['nonadv_steps'] += ctime
 
                 log_dict['episode_len'] += max_time

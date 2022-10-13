@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<config>
+    <source_groups>
+        <source_group_68a23bc7-3685-4d3d-b956-d299b236a59a>
+            <exclude_filters>
+                <exclude_filter>red-blue-doors</exclude_filter>
+            </exclude_filters>
+            <name>Python Source Group</name>
+            <python_environment_path>../../../../anaconda3/envs/ae-fg</python_environment_path>
+            <source_extensions>
+                <source_extension>.py</source_extension>
+            </source_extensions>
+            <source_paths>
+                <source_path>./</source_path>
+            </source_paths>
+            <status>enabled</status>
+            <type>Python Source Group</type>
+        </source_group_68a23bc7-3685-4d3d-b956-d299b236a59a>
+    </source_groups>
+    <version>8</version>
+</config>

@@ -81,9 +81,9 @@ class Worker(mp.Process):
 
         while not check_done(done) and len(trajectory[0]) < self.t_max:
             plogit, value, hidden_state, comm_out, comm_ae_loss = self.net(
-                state_var, hidden_state, env_mask_idx=env_mask_idx)
-            action, _, _, all_actions = self.net.take_action(plogit, comm_out)
-            state, reward, done, info = self.env.step(all_actions)
+                state_var, hidden_state, env_mask_idx=env_mask_idx)     # net의 결과로 현재 타임스텝에서의 가치함수 결과값과 정책 등을 아웃풋으로 받는다.
+            action, _, _, all_actions = self.net.take_action(plogit, comm_out)  # net에 의해 나온 정책에 따라 액션을 취했다.
+            state, reward, done, info = self.env.step(all_actions)  # 방금 구한 액션에 따라 env에서 한 스텝 진행한다.
             state_var = ops.to_state_var(state)
 
             # assert self.num_acts == 1:
@@ -102,7 +102,7 @@ class Worker(mp.Process):
             with torch.no_grad():
                 target_value = self.net(state_var,
                                         hidden_state,
-                                        env_mask_idx=env_mask_idx)[1]
+                                        env_mask_idx=env_mask_idx)[1]   # net의 결과 중 밸류값만 쏙 빼왔다.
                 if self.num_acts == 1:
                     target_value = [target_value]
 
@@ -117,7 +117,7 @@ class Worker(mp.Process):
                     zip(*trajectory[aid]))[2]]
                 values[aid][k].append(ops.to_torch(
                     [target_value[aid][k]]))    #마지막에 텐서 하나 붙이는데 무슨 목적인지 궁금하긴 하다. -> 아 타겟 벨류긴 하다. 근데 왜 굳이?
-                values[aid][k].reverse()
+                values[aid][k].reverse()    #이래서 values[0]의 길이가 20개가 아니라 21개이다. 진짜진짜 신기하다.
 
         return trajectory, values, target_value, done
 
@@ -128,7 +128,7 @@ class Worker(mp.Process):
         reward_log = 0.
 
         global_start = time.time()
-        while not self.master.is_done():
+        while not self.master.is_done():    #이거 끝나면 진짜 학습이 다 끝난 상황. worker is done 출력되는 상황.
             # synchronize network parameters
             weight_iter = self.master.copy_weights(self.net)
             self.net.zero_grad()    #그레디언트 초기화. 싹 다 0으로 만드는 것 같다.
@@ -149,7 +149,7 @@ class Worker(mp.Process):
 
             # extract trajectory
             trajectory, values, target_value, done = \
-                self.get_trajectory(hidden_state, state_var, done)
+                self.get_trajectory(hidden_state, state_var, done)  # 당연히 에이전트 3개에 대한 값들 다 뱉어낸다.
 
             all_pls = [[] for _ in range(self.num_acts)]
             all_vls = [[] for _ in range(self.num_acts)]
@@ -165,7 +165,7 @@ class Worker(mp.Process):
                 tar_val = target_value[aid]
 
                 # compute loss - computed backward
-                traj.reverse()
+                traj.reverse()  #이거 values가 시간 역순인거에 맞춰준거다. 
 
                 for agent in self.agents:
                     gae = torch.zeros(1, 1).cuda()
@@ -173,7 +173,7 @@ class Worker(mp.Process):
 
                     pls, vls, els = [], [], []
                     for i, (pi_logit, action, value, reward, comm_ae_loss
-                            ) in enumerate(traj):
+                            ) in enumerate(traj):                   # 20개의 timestep에서 
                         comm_ae_losses.append(comm_ae_loss.item())  #텐서 변수에서 값만 가져오기!
 
                         # Agent A3C Loss
@@ -184,7 +184,7 @@ class Worker(mp.Process):
                         delta_t = reward[agent] + \
                                   self.gamma * val[agent][i].data - \
                                   val[agent][i + 1].data    # .data는 텐서의 데이터만 가져오는 것 같다. 그냥 값을 복사해온 것이라고 생각한다. 여기서 그냥 웃긴게 reverse를 했으니까 i와 i+1을 쓴거다. 원래는 i+1과 -여야 한다.
-                        gae = gae * self.gamma * self.tau + delta_t #sigma GAE 그 식을 이렇게 표현한 것이다. 점화식 형태로. SSo Good
+                        gae = gae * self.gamma * self.tau + delta_t #sigma GAE 그 식을 이렇게 표현한 것이다. 점화식 형태로.
 
                         tl, (pl, vl, el) = policy_gradient_loss(
                             pi_logit[agent], action[agent], advantage, gae=gae)

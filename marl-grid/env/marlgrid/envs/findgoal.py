@@ -34,6 +34,9 @@ class FindGoalMultiGrid(MultiGridEnv):
             self.n_clutter = n_clutter
 
         self.randomize_goal = randomize_goal
+          ######
+        self.total_rew = 0
+        ######
 
     def _gen_grid(self, width, height):
         self.grid = MultiGrid((width, height))
@@ -63,7 +66,7 @@ class FindGoalMultiGrid(MultiGridEnv):
             agent_done = np.zeros((len(self.agents, )), dtype=np.float)
         self.sees_goal = np.array([self.agents[i].in_view(
                 self.goal_pos[j][0], self.goal_pos[j][1]) for i in range(
-                self.num_agents) for j in range(self.num_agents)]) * 1  # 골이랑 목적지를 보이게 하는 것 같다.
+                self.num_agents) for j in range(self.num_agents*2+1)]) * 1  # 골이랑 목적지를 보이게 하는 것 같다.
                         # np.array([self.agents[i].in_view(
                 # self.goal_pos[0], self.goal_pos[1]) for i in range(
                 # self.num_agents)]) * 1
@@ -137,20 +140,22 @@ class FindGoalMultiGrid(MultiGridEnv):
     def update_reward(self, step_rewards):
         nonadv_done_n = []
         adv_rew = 0.0
-        ######
-        total_rew = 0
-        ######
         for i, agent in enumerate(self.agents):
             if i not in self.adv_indices:
                 # zero-sum reward between adversaries and non-adversaries
                 nonadv_done_n.append(agent.done)
                 #####
-                total_rew += agent.prestige
+                self.total_rew += step_rewards
                 #####
                 adv_rew -= step_rewards[i]
         nonadv_done = all(nonadv_done_n)    #내부가 전부 참이어야지 True를 반환한다.
+        if 6 > self.total_rew.sum() > 3:
+            print("rewards over 3 under 6")
+        
+        if self.total_rew.sum() == 12:
+            nonadv_done = True
 
-        timeout = (self.step_count >= self.max_steps)
+        timeout = (self.step_count >= self.max_steps)   # 여기서 self.max_steps는 예상했던대로 내가 설정했던 1024이다.
 
         # normalized distance-to-goal to range [0, 1]
         ndis_to_goal = [dis_func(agent.pos, self.goal_pos, k=self.max_dis)  # max_dis = np.sqrt(np.sum(np.square([self.width, self.height])))

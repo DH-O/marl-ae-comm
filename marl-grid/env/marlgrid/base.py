@@ -425,6 +425,8 @@ class MultiGridEnv(gym.Env):
         self.separate_rew_more = separate_rew_more
 
         self.agents = []
+        
+        self.endded_objects = 0
 
         for i, agent in enumerate(agents):
             self.add_agent(agent)
@@ -497,6 +499,9 @@ class MultiGridEnv(gym.Env):
             agent.reset(new_episode=True)
 
         self.goal_pos = self._gen_grid(self.width, self.height)
+        ####
+        self.endded_objects = 0
+        ####
 
         for agent in self.agents:
             if agent.spawn_delay == 0:
@@ -827,14 +832,18 @@ class MultiGridEnv(gym.Env):
                                     rwd, agent_no)
                                 env_rewards += env_rew
                                 step_rewards += step_rew
+                                
+                                self.endded_objects += 1
                                 # self.grid.set(*fwd_pos, agent.carrying)
                                 # agent.carrying.cur_pos = fwd_pos
                                 agent.carrying = None
+                                if 5 > self.endded_objects > 3:
+                                        print("endded objects are 4")
+                                if self.endded_objects == 6:
+                                    for agent in self.agents:
+                                        agent.done = True
+                                        print(f"{agent} is done")
                             # self.grid.set(*cur_pos, None)
-                            if env_rewards.sum() == 12:
-                                for agent in self.agents:
-                                    agent.done = True
-                                    print(f"{agent} is done")
                         else:
                             pass
 

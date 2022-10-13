@@ -307,7 +307,7 @@ class GridAgentInterface(GridAgent):
     def dir_vec(self):
         """
         Get the direction vector for the agent, pointing in the direction
-        of forward movement.
+        of forward movement.    #그러니까 앞으로 움직일 방향쪽의 벡터를 보여준다는 뜻인 것 같다.
         """
         assert self.dir >= 0 and self.dir < 4
         return np.array([[1, 0], [0, 1], [-1, 0], [0, -1]])[self.dir]
