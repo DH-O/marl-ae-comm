@@ -198,7 +198,7 @@ class Worker(mp.Process):
 
                         # Agent A3C Loss
                         t_value = reward[agent] + self.gamma * t_value
-                        advantage = t_value - value[agent]
+                        advantage = t_value - value[agent]  #
 
                         # Generalized advantage estimation (GAE)
                         delta_t = reward[agent] + \
@@ -207,7 +207,8 @@ class Worker(mp.Process):
                         gae = gae * self.gamma * self.tau + delta_t
 
                         tl, (pl, vl, el) = policy_gradient_loss(
-                            pi_logit[agent], action[agent], advantage, gae=gae)
+                            pi_logit[agent], action[agent], advantage, gae=gae) # tl이 그냥 로스, 그 뒤로 폴리시 로스 벨류 로스, 엔트로피
+                                                                                # 그냥 로스 tl은 policy_loss + weighted value loss - weighted entropy
 
                         pls.append(ops.to_numpy(pl))
                         vls.append(ops.to_numpy(vl))

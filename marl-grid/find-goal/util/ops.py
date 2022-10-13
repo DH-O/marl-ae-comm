@@ -33,8 +33,8 @@ def dict_to_state_var(x, use_gpu=True, dtype=np.float32):
             var = var.permute(2, 0, 1).unsqueeze(0)
         x[k] = var.cuda() if use_gpu else var
         ######
-        if k == 'past_action':
-            x[k] = None
+        # if k == 'past_action':
+        #     x[k] = None
     return x
 
 

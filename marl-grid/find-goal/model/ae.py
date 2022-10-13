@@ -160,7 +160,7 @@ class EncoderDecoder(nn.Module):
 
         self.preprocessor = InputProcessor(obs_space, 0, num_agents,
                                            last_fc_dim=img_feat_dim)
-        in_size = self.preprocessor.feat_dim
+        in_size = self.preprocessor.feat_dim    # 여기 있는 인풋프로세서 오브젝트는 feat_dim구하기 위함 ㅋㅋㅋㅋ
 
         if ae_type == 'rfc':
             # random projection using fc
@@ -243,7 +243,7 @@ class EncoderDecoder(nn.Module):
                 nn.ReLU(),
                 nn.Linear(64, 128),
                 nn.ReLU(),
-                nn.Linear(128, in_size),
+                nn.Linear(128, in_size),    # 128인 것 같다.
             )
         else:
             raise NotImplementedError
@@ -292,9 +292,8 @@ class EncoderDecoder(nn.Module):
 ############################################################
 class MultiHeadAttention(nn.Module):
     
-    def __init__(self, model_dimension, heads_number):
+    def __init__(self, model_dimension):
         super(MultiHeadAttention, self).__init__()
-        self.heads_number = heads_number    # 64를 넣긴 했는데
         self.attention = ScaleDotProductAttention()
         self.W_Q = nn.Linear(model_dimension, model_dimension)
         self.W_K = nn.Linear(model_dimension, model_dimension)
@@ -304,10 +303,10 @@ class MultiHeadAttention(nn.Module):
         # 1. dot product with weight metrices
         q, k, v = self.W_Q(q), self.W_K(k), self.W_V(v)
         
-        # 3. do scale dot product to compute similarity
+        # 2. do scale dot product to compute similarity
         out, attention = self.attention(q, k, v, mask=mask)
-        
         return out
+
 class ScaleDotProductAttention(nn.Module):
     """
     compute scale dot product attention
@@ -320,9 +319,6 @@ class ScaleDotProductAttention(nn.Module):
         self.softmax = nn.Softmax(dim=-1)
         
     def forward(self, q, k, v, mask=None, e=1e-12):
-        # input is 4 dimension tensor?
-        # [batch_size, head, length , d_tensor]
-        # batch_size, head, 
         length, d_tensor = k.size()
         
         # 1. dot product Query with key^T to compute similarity
@@ -355,7 +351,7 @@ class AENetwork(A3CTemplate):
 
         self.comm_ae = EncoderDecoder(obs_space, comm_len, discrete_comm,
                                       num_agents, ae_type=ae_type,
-                                      img_feat_dim=img_feat_dim)
+                                      img_feat_dim=img_feat_dim)    # 여기서 인코더 디코더를 정의를 했다. 나중에 메세지 인코더에서도 이 디코더를 사용한다. 여기서 인코더디코더 객체(내부에 인풋 프로세서 하나 있낀 함) 하나 생성.
 
         feat_dim = self.comm_ae.preprocessor.feat_dim
         
@@ -368,16 +364,16 @@ class AENetwork(A3CTemplate):
         #     [nn.Linear(self.action_size, comm_len
         #                ) for _ in range(num_agents)])
         
-        self.multi_head_attention = MultiHeadAttention(comm_len, 64)
+        self.multi_head_attention = MultiHeadAttention(comm_len)
         self.act_feat_fc = nn.Linear(self.action_size, comm_len)
-        ##################################
+        ################################
         
         if ae_type == '':
             self.input_processor = InputProcessor(
                 obs_space,
                 feat_dim,   # 아래랑 위랑 두번째 줄만 다르다. 
                 num_agents,
-                last_fc_dim=img_feat_dim)
+                last_fc_dim=img_feat_dim)   # 위에 있는 인코더 디코더랑 다른 그저 인풋프로세서이다. 유념해보자. 여기서 인풋프로세서 객체 하나 생성.
         else:
             self.input_processor = InputProcessor(
                 obs_space,
@@ -416,7 +412,7 @@ class AENetwork(A3CTemplate):
     def init_hidden(self):
         return [head.init_hidden() for head in self.head]
 
-    def take_action(self, policy_logit, comm_out):
+    def take_action(self, policy_logit, comm_out):  #action policy라고 해야하나
         act_dict = {}
         act_logp_dict = {}
         ent_list = []
@@ -428,7 +424,7 @@ class AENetwork(A3CTemplate):
             act_logp_dict[agent_name] = act_logp
             ent_list.append(ent)
 
-            comm_act = (comm_out[int(agent_name[-1])]).cpu().numpy()
+            comm_act = (comm_out[int(agent_name[-1])]).cpu().numpy()    # 1,10 차원의 comm_out을 그냥 넘파이로 바꾸고 있다.
             all_act_dict[agent_name] = [act, comm_act]
         return act_dict, act_logp_dict, ent_list, all_act_dict
 
@@ -441,8 +437,8 @@ class AENetwork(A3CTemplate):
         # (1) pre-process inputs
         comm_feat = []
         for i in range(self.num_agents):
-            ########################
-            if inputs[f'agent_{i}']['past_action'] is not None:
+            #######################
+            if inputs[f'agent_{i}'].setdefault('past_action') is not None:
                 else_action_list = list(range(self.num_agents))
                 del else_action_list[i]
                 act_feat = []
@@ -458,10 +454,10 @@ class AENetwork(A3CTemplate):
                 cf_naive = self.comm_ae.decode(inputs[f'agent_{i}']['comm'][:-1])
                 cf = torch.cat((cf_attended, cf_naive),dim=0)
             else:
-            ###############################
-                # cf = self.comm_ae.decode(inputs[f'agent_{i}']['comm'][:-1]) # 메세지 인코더 돌린 것 같다. 근데 한 줄을 뺐다
-                cf_naive = self.comm_ae.decode(inputs[f'agent_{i}']['comm'][:-1])
+            ##############################
+                cf_naive = self.comm_ae.decode(inputs[f'agent_{i}']['comm'][:-1])   # 결국 AENet 생성자 속 오토인코더의 디코더를 사용한게 맞다. 
                 cf = torch.cat((cf_naive, cf_naive),dim=0)
+            cf = self.comm_ae.decode(inputs[f'agent_{i}']['comm'][:-1]) # 메세지 인코더 돌린 것 같다. 근데 한 줄을 뺐다.
                 
             
             if not self.ae_pg:
@@ -469,6 +465,7 @@ class AENetwork(A3CTemplate):
             comm_feat.append(cf)
 
         cat_feat = self.input_processor(inputs, comm_feat)  # 384까지 뻥튀기가 되기도 한다. 우선 comm_feat는 총 3개 있고, 각각 2,128 차원이다.  #그러니까 이미지 피쳐랑 comm 피쳐 다 합친거다.
+                                                            # 생성자에서 생성한 인풋프로세서이며 여기선 comm_feat때문에 아웃풋이 384(+128*2)까지 뻥튀기된다. 
 
         # (2) generate AE comm output and reconstruction loss
         with torch.no_grad():

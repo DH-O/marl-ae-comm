@@ -27,7 +27,7 @@ def discrete_policy_gradient_loss(policy_logit, action, advantage, gae=False,
                                   value_weight=0.5, entropy_weight=0.01):
     policy = F.softmax(policy_logit, dim=-1)[0]
     log_policy = F.log_softmax(policy_logit, dim=-1)[0]
-    log_policy_action = log_policy[action]
+    log_policy_action = log_policy[action]  #액션이랑 gae가 폴리시 로스에 기여를 했다고 볼 수 있다. 어드벤티지또한 그렇다.
 
     if gae is not False and gae is not None:
         policy_loss = -log_policy_action * gae[0].detach()
