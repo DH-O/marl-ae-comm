@@ -14,7 +14,6 @@ from model.init import weights_init
 
 ############################################################
 class MultiHeadAttention(nn.Module):
-    
     def __init__(self, model_dimension):
         super(MultiHeadAttention, self).__init__()
         self.attention = ScaleDotProductAttention()
@@ -27,9 +26,9 @@ class MultiHeadAttention(nn.Module):
         q, k, v = self.W_Q(q), self.W_K(k), self.W_V(v)
         
         # 3. do scale dot product to compute similarity
-        out, attention = self.attention(q, k, v, mask=mask)
-        
+        out, score = self.attention(q, k, v, mask=mask)
         return out
+    
 class ScaleDotProductAttention(nn.Module):
     """
     compute scale dot product attention
@@ -53,7 +52,6 @@ class ScaleDotProductAttention(nn.Module):
         
         # 3. multiply with Value
         v = score @ v
-        
         return v, score
 #################################
 
@@ -84,7 +82,7 @@ class LSTMhead(nn.Module):
 
 class ImgModule(nn.Module):
     """Process image inputs of shape CxHxW."""
-    def __init__(self, input_size, last_fc_dim=0, act_dim=5):
+    def __init__(self, input_size, last_fc_dim=0, action_dim=5):
         super(ImgModule, self).__init__()
         self.conv1 = self.make_layer(input_size[2], 32)
         self.conv2 = self.make_layer(32, 32)
@@ -98,11 +96,13 @@ class ImgModule(nn.Module):
         self.apply(weights_init)
         ###########################
         self.num_agents = 3
-        self.multi_head_attention = MultiHeadAttention(72)
-        self.act_feat_fc = nn.Linear(act_dim, 72)
-        self.emb_img = nn.Linear(288,72)
-        self.decode_atten = nn.Linear(72,288)
-        self.act_dim = act_dim
+        self.multi_head_attention1 = MultiHeadAttention(32*11*11)
+        self.multi_head_attention = MultiHeadAttention(288)
+        self.act_feat_fc1 = nn.Linear(action_dim, 32*11*11)
+        self.act_feat_fc = nn.Linear(action_dim, 288)
+        # self.emb_img = nn.Linear(288,72)
+        self.decode_atten = nn.Linear(32*11*11,288)
+        self.act_dim = action_dim
         ############################
 
     def make_layer(self, in_ch, out_ch, use_norm=True):
@@ -114,25 +114,38 @@ class ImgModule(nn.Module):
         return nn.Sequential(*layer)
 
     def forward(self, image_inputs, action_inputs):
-        x = self.conv1(image_inputs)
-        x = self.conv2(x)
-        x = self.conv3(x)
-        x = self.conv4(x)
-        x = self.avgpool(x)
-        x = x.view(-1, 32 * 3 * 3)  # feature dim
-        act_feat_list = []
-        if action_inputs[f'agent_{0}']['past_action'] is not None:
-            x = self.emb_img(x)
+        x = self.conv1(image_inputs)    # 32,21,21
+        x = self.conv2(x)   #32,11,11
+        if action_inputs[f'agent_{0}'].setdefault('past_action') is not None:
+            x_trans = x.view(-1, 32 * 11 * 11)  # feature dim
+            act_feat_list1 = []
             for i in range(self.num_agents):
                 act_hot = F.one_hot(action_inputs[f'agent_{i}']['past_action'], num_classes=self.act_dim)
-                act_feat = self.act_feat_fc(act_hot.float()).reshape(1,72)
-                act_feat_list.append(act_feat)  # act_feat은 1,72로 뽑아준다.
-                if len(act_feat_list) == 1:
-                    act_feat_tensor = act_feat_list[0]
+                act_feat = self.act_feat_fc1(act_hot.float()).reshape(1,32*11*11) # act_feat은 1,72로 뽑아준다.
+                act_feat_list1.append(act_feat)  
+                if len(act_feat_list1) == 1:
+                    act_feat_tensor1 = act_feat_list1[0]
                 else:
-                    act_feat_tensor = torch.cat((act_feat_tensor, act_feat_list[-1]), dim=0)
-            x = self.multi_head_attention(x, act_feat_tensor, x)
-            x = self.decode_atten(x)
+                    act_feat_tensor1 = torch.cat((act_feat_tensor1, act_feat_list1[-1]), dim=0)
+            x_trans = self.multi_head_attention1(x_trans, act_feat_tensor1, x_trans)
+            x_trans = self.decode_atten(x_trans)
+        x = self.conv3(x)   #32,6,6
+        x = self.conv4(x)   #32,3,3
+        x = self.avgpool(x) #32,3,3
+        x = x.view(-1, 32 * 3 * 3)  # feature dim
+        # if action_inputs[f'agent_{0}'].setdefault('past_action') is not None:
+        #     # # x = self.emb_img(x)
+        #     # act_feat_list = []
+        #     # for i in range(self.num_agents):
+        #     #     act_hot = F.one_hot(action_inputs[f'agent_{i}']['past_action'], num_classes=self.act_dim)
+        #     #     act_feat = self.act_feat_fc(act_hot.float()).reshape(1,288) # act_feat은 1,288로 뽑아준다.
+        #     #     act_feat_list.append(act_feat)  
+        #     #     if len(act_feat_list) == 1:
+        #     #         act_feat_tensor = act_feat_list[0]
+        #     #     else:
+        #     #         act_feat_tensor = torch.cat((act_feat_tensor, act_feat_list[-1]), dim=0)
+        #     # x = self.multi_head_attention(x, act_feat_tensor, x)
+        #     x = self.multi_head_attention(x, x_trans, x)
         if self.fc is not None:
             return self.fc(x)
         return x

@@ -43,7 +43,7 @@ class InputProcessor(nn.Module):
 
         # image processor
         assert 'pov' in self.obs_keys
-        self.conv = ImgModule(obs_space['pov'].shape, last_fc_dim=last_fc_dim, act_dim=act_dim)
+        self.conv = ImgModule(obs_space['pov'].shape, last_fc_dim=last_fc_dim, action_dim=act_dim)
         feat_dim = last_fc_dim
 
         # state inputs processor
@@ -154,11 +154,11 @@ class InputProcessor(nn.Module):
 
 class EncoderDecoder(nn.Module):
     def __init__(self, obs_space, comm_len, discrete_comm, num_agents,
-                 ae_type='', img_feat_dim=64, act_dim=5):
+                 ae_type='', img_feat_dim=64, ED_act_dim=5):
         super(EncoderDecoder, self).__init__()
 
         self.preprocessor = InputProcessor(obs_space, 0, num_agents,
-                                           last_fc_dim=img_feat_dim, act_dim=act_dim)
+                                           last_fc_dim=img_feat_dim, act_dim=ED_act_dim)
         in_size = self.preprocessor.feat_dim
 
         if ae_type == 'rfc':
@@ -303,45 +303,9 @@ class MultiHeadAttention(nn.Module):
     def forward(self, q, k, v, mask=None):
         # 1. dot product with weight metrices
         q, k, v = self.W_Q(q), self.W_K(k), self.W_V(v)
-        
-        # # 2. split tensor by number of heads
-        # q, k, v = self.split(q), self.split(k), self.split(v)
-        
-        # 3. do scale dot product to compute similarity
         out, attention = self.attention(q, k, v, mask=mask)
-        
-        # 4. concat and pass to linear layer
-        # out = self.concat(out)
-        # out = self.w_concat(out)
-        
-        return out
-        
-    # def split(self, tensor):    #tensor가 2,10이 나오긴한다.
-    #     """
-    #     split tensor by number of head
 
-    #     :param tensor: [batch_size, length, model_dimension
-    #     :return: [batch_size, head, length, tensor_dimension]
-    #     """
-    #     batch_size, length, model_dimension = tensor.size() #Tensor.shape나 size나 기능은 비슷비슷하다.
-    #     tensor_dimension = model_dimension // self.heads_number
-    #     tensor = tensor.reshape(batch_size, length, self.heads_number, tensor_dimension).transpose(1,2)
-    #     # it is similar with group convolution (split by nymber of heads)
-        
-    #     return tensor
-    
-    # def concat(self, tensor):
-    #     """
-    #     inverse function of self.split(tensor : torch.Tensor)
-        
-    #     :param tensor: [batch_size, head, length, d_tensor]
-    #     :return: [batch_size, length, d_model]
-    #     """
-    #     batch_size, head, length, d_tensor = tensor.size()
-    #     d_model = head * d_tensor
-        
-    #     tensor = tensor.transpose(1,2).contiguous().view(batch_size, length, d_model)
-    #     return tensor
+        return out
         
 class ScaleDotProductAttention(nn.Module):
     """
@@ -355,23 +319,16 @@ class ScaleDotProductAttention(nn.Module):
         self.softmax = nn.Softmax(dim=-1)
         
     def forward(self, q, k, v, mask=None, e=1e-12):
-        # input is 4 dimension tensor?
-        # [batch_size, head, length , d_tensor]
-        # batch_size, head, 
         length, d_tensor = k.size()
         
         # 1. dot product Query with key^T to compute similarity
         k_t = k.transpose(0,1) # transpose
         score = (q @ k_t) / math.sqrt(d_tensor) # scaled dot product
-        
-        # # 2. applying masking (opt)
-        # if mask is None:
-        #     score = score.masked_fill(mask == 0, -e)
             
-        # 3. pass them softmax to make [0,1] range
+        # 2. pass them softmax to make [0,1] range
         score = self.softmax(score)
         
-        # 4. multiply with Value
+        # 3. multiply with Value
         v = score @ v
         
         return v, score
@@ -394,7 +351,7 @@ class AENetwork(A3CTemplate):
 
         self.comm_ae = EncoderDecoder(obs_space, comm_len, discrete_comm,
                                       num_agents, ae_type=ae_type,
-                                      img_feat_dim=img_feat_dim, act_dim=self.action_size)
+                                      img_feat_dim=img_feat_dim, ED_act_dim=self.action_size)
 
         feat_dim = self.comm_ae.preprocessor.feat_dim
         
@@ -481,22 +438,6 @@ class AENetwork(A3CTemplate):
         # (1) pre-process inputs
         comm_feat = []
         for i in range(self.num_agents):
-            ########################
-            # if inputs[f'agent_{i}']['past_action'] is not None:
-            #     else_action_list = list(range(self.num_agents))
-            #     del else_action_list[i]
-            #     act_feat = []
-            #     for j in else_action_list:
-            #         act_hot = F.one_hot(inputs[f'agent_{j}']['past_action'], num_classes=self.action_size)
-            #         act_feat.append(self.act_feat_fc(act_hot.float())) # act_feat은 1,10의 텐서다.
-            #         if len(act_feat) == 1:
-            #             act_feat_tensor = act_feat[0]
-            #         else:
-            #             act_feat_tensor = torch.stack((act_feat_tensor, act_feat[-1]), dim=0)
-            #     attention_value = self.multi_head_attention(inputs[f'agent_{i}']['comm'][:-1], inputs[f'agent_{i}']['comm'][:-1], inputs[f'agent_{i}']['comm'][:-1])
-            #     cf = self.comm_ae.decode(attention_value)
-            # else:
-            ###############################
             cf = self.comm_ae.decode(inputs[f'agent_{i}']['comm'][:-1]) # 메세지 인코더 돌린 것 같다. 근데 한 줄을 뺐다
             
             if not self.ae_pg:

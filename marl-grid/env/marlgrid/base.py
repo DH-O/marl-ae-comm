@@ -601,7 +601,7 @@ class MultiGridEnv(gym.Env):
             if agent.observe_comm:
                 ret['comm'] = self.gen_agent_comm_obs(agent)
             ######
-            ret['past_action'] = None
+            # ret['past_action'] = None
             ######                
             return ret
         elif agent.observation_style == 'tuple':
