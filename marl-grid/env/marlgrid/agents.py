@@ -105,6 +105,10 @@ class GridAgentInterface(GridAgent):
         self.is_adversary = is_adversary
         self.observe_identity = observe_identity
         self.skill = skill
+        ####### agent_followed, following 변수 생성
+        self.agent_followed = []
+        # self.agent_following = None
+        ######
 
         # "stay" action by default
         self.env_act = 4

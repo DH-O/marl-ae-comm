@@ -96,10 +96,12 @@ class Evaluator(mp.Process):
 
                 while not check_done(done):
                     if self.net_type == 'ae':
-                        plogit, _, hidden_state, comm_out, _ = self.net(
+                        ########agent_pair 추가###########
+                        plogit, _, hidden_state, comm_out, _, agent_pair = self.net(
                             state_var, hidden_state, env_mask_idx=env_mask_idx)
                         _, _, ent, action = self.net.take_action(plogit,
-                                                                 comm_out)
+                                                                 comm_out, agent_pair)
+                    ###################
                     else:
                         plogit, _, hidden_state = self.net(
                             state_var, hidden_state, env_mask_idx=env_mask_idx)

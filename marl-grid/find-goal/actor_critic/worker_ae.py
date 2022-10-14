@@ -80,9 +80,11 @@ class Worker(mp.Process):
         trajectory = [[] for _ in range(self.num_acts)] # 이거 왜 range가 하나밖에 안 나올까요?
 
         while not check_done(done) and len(trajectory[0]) < self.t_max:
-            plogit, value, hidden_state, comm_out, comm_ae_loss = self.net(
+            ################ agent_pair 추가
+            plogit, value, hidden_state, comm_out, comm_ae_loss, agent_pair = self.net(
                 state_var, hidden_state, env_mask_idx=env_mask_idx)
-            action, _, _, all_actions = self.net.take_action(plogit, comm_out)
+            action, _, _, all_actions = self.net.take_action(plogit, comm_out, agent_pair)
+            ##################
             state, reward, done, info = self.env.step(all_actions)
             state_var = ops.to_state_var(state)
 

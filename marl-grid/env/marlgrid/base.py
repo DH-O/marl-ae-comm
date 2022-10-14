@@ -622,6 +622,9 @@ class MultiGridEnv(gym.Env):
                 ret['identity'] = agent.is_adversary
             if agent.observe_comm:
                 ret['comm'] = self.gen_agent_comm_obs(agent)
+            ######
+            ret['agent_followed'] = agent.agent_followed
+            #####
             return ret
         elif agent.observation_style == 'tuple':
             ret = (grid_image,)
@@ -725,6 +728,9 @@ class MultiGridEnv(gym.Env):
                     if not os.path.isdir(f'./{agent}/'):
                         os.makedirs(f'./{agent}/')
                     plt.imsave(f'./{agent}/' + f'{agent} not cur_cell.jpeg', img_cur_pos/255.)
+                # temp_pos = None
+                temp_no = []
+                temp_cell = []
                 #######
                 
                 fwd_pos = agent.front_pos[:]
@@ -806,16 +812,56 @@ class MultiGridEnv(gym.Env):
                         if agent.carrying is None:
                             if isinstance(fwd_cell, Goal):
                                 if hasattr(fwd_cell, 'get_reward'):
-                                    rwd = fwd_cell.get_reward(agent)
-                                    env_rew, step_rew = self._get_reward(
-                                        rwd, agent_no)
-                                    env_rewards += env_rew
-                                    step_rewards += step_rew
-                                agent.carrying = fwd_cell
-                                agent.carrying.cur_pos = np.array([-1, -1])
-                                self.grid.set(*fwd_pos, None)
-                            else:
-                                pass
+                ############## 난리났다
+                                    if fwd_cell.weight == 1:
+                                        rwd = fwd_cell.get_reward(agent)
+                                        env_rew, step_rew = self._get_reward(
+                                            rwd, agent_no)
+                                        env_rewards += env_rew
+                                        step_rewards += step_rew
+                                        agent.carrying = fwd_cell
+                                        agent.carrying.cur_pos = np.array([-1, -1])
+                                        self.grid.set(*fwd_pos, None)
+                                    else:
+                                        if fwd_cell.tagged == True:
+                                            rwd = 1
+                                            env_rew, step_rew = self._get_reward(
+                                                rwd, agent_no)
+                                            env_rewards += env_rew
+                                            step_rewards += step_rew
+                                            agent_moved = True
+                                            # Add agent to temp_cell
+                                            iter = zip(temp_no, temp_cell)
+                                            for agent_tagging_no, agent_tagging in iter:
+                                                agent_tagging.activate()
+                                                agent_tagging.carrying = 1
+                                                agent.agent_followed.append(agent_tagging_no)
+                                                # agent_tagging.agent_following = agent_no
+                                            agent.carrying = fwd_cell
+                                            agent.carrying.cur_pos = np.array([-1, -1])
+                                            self.grid.set(*fwd_pos, None)
+                                            # agent.pos = temp_pos
+                                            # Remove agent from old cell
+                                            # if cur_cell == agent:
+                                            #     self.grid.set(*cur_pos, None)
+                                            # else:
+                                            #     if not hasattr(cur_cell,'can_overlap'):
+                                            #         pass
+                                            #     else:
+                                            #         if agent in cur_cell.agents:
+                                            #             cur_cell.agents.remove(agent)
+                                        else:
+                                            rwd = fwd_cell.get_reward(agent)
+                                            env_rew, step_rew = self._get_reward(
+                                                rwd, agent_no)
+                                            env_rewards += env_rew
+                                            step_rewards += step_rew
+                                            fwd_cell.tagged = True
+                                            # temp_pos = cur_cell.pose
+                                            temp_cell.append(cur_cell)
+                                            temp_no.append(agent_no)
+                                            agent.deactivate()
+                ###################
 
                 # Drop an object
                 elif action == agent.actions.drop:
@@ -831,6 +877,11 @@ class MultiGridEnv(gym.Env):
                                 # agent.carrying.cur_pos = fwd_pos
                                 agent.carrying = None
                             # self.grid.set(*cur_pos, None)
+                            ############# 따라가던 애들 다 비우기
+                                if bool(agent.agent_followed):
+                                    for no in agent.agent_followed:
+                                        iter_agents[no][1].carrying = None
+                            ###############
                         else:
                             pass
 
@@ -881,6 +932,11 @@ class MultiGridEnv(gym.Env):
                     'comm_rewards': comm_rewards}
 
         obs = self.gen_obs()
+        ##################### return 하기 전에
+        for i, agent in enumerate(agent for agent in self.agents):
+            # obs[i]['agent_following'] = agent.agent_following
+            obs[i]['agent_followed'] = agent.agent_followed
+        ##################
         obs_dict = {f'agent_{i}': obs[i] for i in range(len(obs))}
 
         info_dict = {'comm_strs': comm_strs}

@@ -228,6 +228,10 @@ class Goal(WorldObj):
     def __init__(self, reward, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.reward = reward
+        ####### weight, tagged 구현
+        self.weight = np.random.randint(1,2)
+        self.tagged = False
+        ###########
 
     def can_overlap(self):
         return True    #원래는 True였다. 다시 트루로 하면 애러가 뜨는 것 같던데
@@ -242,7 +246,12 @@ class Goal(WorldObj):
         return True
 
     def render(self, img):
-        fill_coords(img, point_in_circle(0.5, 0.5, 0.31), COLORS[self.color])   #골을 동그라미로 바꿔봤다.
+        ########weight에 따라 랜더링 변화
+        if self.weight == 1:
+            fill_coords(img, point_in_circle(0.5, 0.5, 0.31), COLORS[self.color])   #골을 동그라미로 바꿔봤다.
+        else:
+            fill_coords(img, point_in_circle(0.5, 0.5, 0.31), COLORS['yellow'])
+        #########################
 
 class Destination(WorldObj):
     def __init__(self, reward, *args, **kwargs):

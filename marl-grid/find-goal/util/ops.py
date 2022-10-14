@@ -27,11 +27,16 @@ def _to_state_var(x, use_gpu=True, dtype=np.float32):
 
 def dict_to_state_var(x, use_gpu=True, dtype=np.float32):
     for k, v in x.items():
-        v = np.array(v, dtype=dtype)
-        var = torch.from_numpy(v)
-        if k == 'pov':
-            var = var.permute(2, 0, 1).unsqueeze(0)
-        x[k] = var.cuda() if use_gpu else var
+        ##### agent_followed때문에
+        if k == 'agent_followed':
+            x[k] = v
+        else:
+            ####
+            v = np.array(v, dtype=dtype)
+            var = torch.from_numpy(v)
+            if k == 'pov':
+                var = var.permute(2, 0, 1).unsqueeze(0)
+            x[k] = var.cuda() if use_gpu else var
     return x
 
 

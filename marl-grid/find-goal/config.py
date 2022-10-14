@@ -25,7 +25,7 @@ def get_env_cfg():
     config.num_agents = 3 
     config.num_adversaries = 0
 
-    config.max_steps = 768  #max steps 늘려봤다
+    config.max_steps = 1024  #max steps로 늘려봤다.
     config.grid_size = 15
     config.observation_style = 'dict'
     config.observe_position = False
