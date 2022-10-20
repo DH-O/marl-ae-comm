@@ -25,7 +25,7 @@ def get_env_cfg():
     config.num_agents = 3 
     config.num_adversaries = 0
 
-    config.max_steps = 512
+    config.max_steps = 1024 #2배 뻥튀기
     config.grid_size = 15
     config.observation_style = 'dict'
     config.observe_position = False

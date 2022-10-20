@@ -1,3 +1,5 @@
 __pycache__
 .DS_Store
 /marl-grid/find-goal/runs
+/marl-grid/red-blue-doors/runs/
+/marl-grid/runs/
