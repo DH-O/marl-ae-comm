@@ -87,9 +87,9 @@ def get_config(args, eval=False):
     config.tmax = 20
 
     # max total training iterations
-    config.train_iter = 300000
+    config.train_iter = 600000
 
-    config.lr = 0.0001
+    config.lr = 0.00001 #learning rate를 10분의 1로 줄여봤따.
 
     # experiment id
     config.resume_path = ''
