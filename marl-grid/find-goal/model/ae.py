@@ -360,17 +360,18 @@ class AENetwork(A3CTemplate):
             act_dict[agent_name] = act
             act_logp_dict[agent_name] = act_logp
             ent_list.append(ent)
+            
             comm_act = (comm_out[int(agent_name[-1])]).cpu().numpy()
             all_act_dict[agent_name] = [act, comm_act]
         ##### 행동 따라가도록 바꿈#####
-        for i, (agent_name, logits) in enumerate(policy_logit.items()):
-            for j, (agent, agent_followed) in enumerate(agent_pair.items()):
-                if agent_name in agent_followed:
-                    act_dict[agent_name] = act_dict[agent]
-                    act_logp_dict[agent_name] = act_logp_dict[agent]
-                    ent_list[i] = ent_list[j]
-                    comm_act = (comm_out[int(agent[-1])]).cpu().numpy()
-                    all_act_dict[agent_name] = [act_dict[agent], comm_act]
+        # for i, (agent_name, logits) in enumerate(policy_logit.items()):
+        #     for j, (agent, agent_followed) in enumerate(agent_pair.items()):
+        #         if agent_name in agent_followed:
+        #             act_dict[agent_name] = act_dict[agent]
+        #             act_logp_dict[agent_name] = act_logp_dict[agent]
+        #             ent_list[i] = ent_list[j]
+        #             comm_act = (comm_out[int(agent[-1])]).cpu().numpy()
+        #             all_act_dict[agent_name] = [act_dict[agent], comm_act]
         ############### 
         return act_dict, act_logp_dict, ent_list, all_act_dict
 
@@ -388,10 +389,10 @@ class AENetwork(A3CTemplate):
         for i in range(self.num_agents):
             cf = self.comm_ae.decode(inputs[f'agent_{i}']['comm'][:-1])
             ##### leader and follower agents
-            agent_pair[f'agent_{i}'] = []
-            if bool(inputs[f'agent_{i}']['agent_followed']):
-                for j in inputs[f'agent_{i}']['agent_followed']:
-                    agent_pair[f'agent_{i}'].append(f'agent_{j}')
+            # agent_pair[f'agent_{i}'] = []
+            # if bool(inputs[f'agent_{i}']['coupled_list']):
+            #     for j in inputs[f'agent_{i}']['coupled_list']:
+            #         agent_pair[f'agent_{i}'].append(f'agent_{j}')
             #########################
             if not self.ae_pg:
                 cf = cf.detach()

@@ -6,14 +6,7 @@ from enum import IntEnum
 
 from .objects import GridAgent, BonusTile
 
-# from gym_minigrid.rendering import (
-#     fill_coords,
-#     point_in_circle,
-#     point_in_rect,
-#     point_in_triangle,
-#     rotate_fn,
-# )
-
+###############################################################
 COLORS = {
     'red': np.array([255, 0, 0]),
     'orange': np.array([255, 165, 0]),
@@ -30,6 +23,7 @@ COLORS = {
     'prestige': np.array([255, 255, 255]),
     'shadow': np.array([35, 25, 30]),  # dark purple color for invisible cells
 }
+#####################################################
 
 class GridAgentInterface(GridAgent):
     class actions(IntEnum):
@@ -105,15 +99,20 @@ class GridAgentInterface(GridAgent):
         self.is_adversary = is_adversary
         self.observe_identity = observe_identity
         self.skill = skill
-        ####### agent_followed, following 변수 생성
-        self.agent_followed = []
+        ####### coupled_list, agent_free, agent_coupled 변수 생성
+        self.coupled_list = []
+        self.coupled_no = []
+        self.coupled = False
+        self.agent_free = True
         # self.agent_following = None
         ######
 
         # "stay" action by default
         self.env_act = 4
         if self.restrict_actions:
+            ################
             env_act_dim = 8 # 다 해보자 ㅋㅋ
+            ###############
         else:
             env_act_dim = 6
 

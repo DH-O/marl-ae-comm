@@ -225,16 +225,20 @@ class BonusTile(WorldObj):
 
 
 class Goal(WorldObj):
-    def __init__(self, reward, *args, **kwargs):
+    def __init__(self, color, reward, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.reward = reward
         ####### weight, tagged 구현
-        self.weight = np.random.randint(1,2)
-        self.tagged = False
+        # if color == 'green':
+        #     self.weight = 1
+        # else:
+        self.weight = 2
+        self.tagged_list = []
+        self.tagged_no = []
         ###########
 
     def can_overlap(self):
-        return True    #원래는 True였다. 다시 트루로 하면 애러가 뜨는 것 같던데
+        return False    #원래는 True였다. 다시 트루로 하면 애러가 뜨는 것 같던데
 
     def get_reward(self, agent):
         return self.reward
@@ -247,10 +251,10 @@ class Goal(WorldObj):
 
     def render(self, img):
         ########weight에 따라 랜더링 변화
-        if self.weight == 1:
-            fill_coords(img, point_in_circle(0.5, 0.5, 0.31), COLORS[self.color])   #골을 동그라미로 바꿔봤다.
-        else:
-            fill_coords(img, point_in_circle(0.5, 0.5, 0.31), COLORS['yellow'])
+        # if self.weight == 1:
+        #     fill_coords(img, point_in_circle(0.5, 0.5, 0.31), COLORS['green'])   #골을 동그라미로 바꿔봤다.
+        # elif self.weight == 2:
+        fill_coords(img, point_in_circle(0.5, 0.5, 0.31), COLORS['yellow'])
         #########################
 
 class Destination(WorldObj):

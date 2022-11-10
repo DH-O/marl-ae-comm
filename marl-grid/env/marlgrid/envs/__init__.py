@@ -89,8 +89,10 @@ def get_env_creator(
         comm_len=1,
         discrete_comm=True,
         n_adversaries=0,
-        neutral_shape=False,    # 에이전트를 삼각형으로 만들자
+        #####################
+        neutral_shape=False,    # 에이전트를 삼각형으로 만들자. 위에서 True로 했는데 이거로 덮어진 것 같다.
         can_overlap=True,   # 트루로 복귀했다.
+        ######################
         env_kwargs={}
 ):
     def env_creator(env_config):
@@ -139,8 +141,10 @@ def get_env_class_creator(
         comm_len=1,
         discrete_comm=True,
         n_adversaries=0,
-        neutral_shape=True,
-        can_overlap=True,
+        neutral_shape=True, #영향을 안 받나 보다.
+        ################
+        can_overlap=False,
+        ################
         env_kwargs={}
 ):
     class GymEnv(env_class):

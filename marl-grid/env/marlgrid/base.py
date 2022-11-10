@@ -7,6 +7,7 @@ import gym_minigrid
 import math
 import numpy as np
 import warnings
+########################
 import matplotlib.pyplot as plt
 import os
 
@@ -19,6 +20,7 @@ from torch import has_spectral
 from .agents import GridAgentInterface
 from .objects import GridAgent ,Wall, Goal, Destination, COLORS
 #데스티네이션을 추가했다.
+#########################
 
 TILE_PIXELS = 32
 
@@ -276,13 +278,17 @@ class MultiGrid:
         obj.render(img)
         ########
         if obj.type == 'Agent':
-            if not (obj.carrying==None):
-                fill_coords(img, point_in_circle(0.5, 0.5, 0.31), COLORS['green'])   #골을 동그라미로 바꿔봤다.
-                shape_fn = point_in_triangle((0.12, 0.19), (0.87, 0.50),
-                                            (0.12, 0.81),)
-                shape_fn = rotate_fn(shape_fn, cx=0.5, cy=0.5,
-                                    theta=1.5 * np.pi * obj.dir)
-                fill_coords(img, shape_fn, COLORS[obj.color])
+            if obj.carrying:
+                if obj.carrying != 1:
+                    if obj.carrying.weight == 1:
+                        fill_coords(img, point_in_circle(0.5, 0.5, 0.31), COLORS['green'])   #골을 동그라미로 바꿔봤다.
+                    else:
+                        fill_coords(img, point_in_circle(0.5, 0.5, 0.31), COLORS['yellow'])   #골을 동그라미로 바꿔봤다.
+                    shape_fn = point_in_triangle((0.12, 0.19), (0.87, 0.50),
+                                                (0.12, 0.81),)
+                    shape_fn = rotate_fn(shape_fn, cx=0.5, cy=0.5,
+                                        theta=1.5 * np.pi * obj.dir)
+                    fill_coords(img, shape_fn, COLORS[obj.color])
         ########
         return downsample(img, subdivs).astype(np.uint8)
 
@@ -623,7 +629,7 @@ class MultiGridEnv(gym.Env):
             if agent.observe_comm:
                 ret['comm'] = self.gen_agent_comm_obs(agent)
             ######
-            ret['agent_followed'] = agent.agent_followed
+            # ret['coupled_list'] = agent.coupled_list
             #####
             return ret
         elif agent.observation_style == 'tuple':
@@ -696,6 +702,15 @@ class MultiGridEnv(gym.Env):
         iter_agents = list(enumerate(zip(self.agents, actions)))
         iter_order = np.arange(len(iter_agents))    #에이전트 2개면 그냥 array([0,1]) 내뱉는다
         self.np_random.shuffle(iter_order)
+        
+        # Heavy weight때문에 추가한 변수들
+        # temp_no = []
+        # temp_cell = []
+        #######
+        ##########agent_following 설정
+        agent_following = None
+        ####################
+        
         for shuffled_ix in iter_order:
             agent_no, (agent, action) = iter_agents[shuffled_ix]
             agent.step_reward = 0
@@ -705,54 +720,76 @@ class MultiGridEnv(gym.Env):
                 assert len(action[1]) == self.comm_len
                 agent.env_act = action[0]
                 agent.comm = action[1]
+                if agent.coupled:
+                    agent_following = agent.coupled_list[0]
+                    if self.comm_dim > 0 and self.comm_len > 0:
+                        agent_following.env_act = action[0]
+                        agent_following.comm = action[1]
+                        action_following = agent_following.env_act
+                    else:
+                        action_following.env_act = action
                 action = agent.env_act
             else:
                 agent.env_act = action
 
             if agent.active:
                 cur_pos = agent.pos[:]
-                i = 0
                 cur_cell = self.grid.get(*cur_pos)
                 #########
+                # i = 0
                 while not cur_cell:
                     self.grid.set(*cur_pos, agent)
                     cur_cell = self.grid.get(*cur_pos)
                     print(f"cur_cell: {cur_cell}")
-                    i += 1
-                    if i == 100:
-                        print("i is 100!")
-                        print(f"cur_cell: {cur_cell}")
-                        break
+                    # i += 1
+                    # if i == 100:
+                    #     print("i is 100!")
+                    #     print(f"cur_cell: {cur_cell}")
+                    #     break
                 if not cur_cell:
                     img_cur_pos = self.grid.render(tile_size=TILE_PIXELS)
                     if not os.path.isdir(f'./{agent}/'):
                         os.makedirs(f'./{agent}/')
                     plt.imsave(f'./{agent}/' + f'{agent} not cur_cell.jpeg', img_cur_pos/255.)
-                # temp_pos = None
-                temp_no = []
-                temp_cell = []
-                #######
                 
                 fwd_pos = agent.front_pos[:]
                 fwd_cell = self.grid.get(*fwd_pos)
-                
-                ######
-                if not cur_cell:
-                    img_fwd_pos = self.grid.render(tile_size=TILE_PIXELS)
-                    if not os.path.isdir(f'./{agent}/'):
-                        os.makedirs(f'./{agent}/')
-                    plt.imsave(f'./{agent}/' + f'{agent} not cur_cell_fwd_cell.jpeg', img_fwd_pos/255.)
-                #######
                 agent_moved = False
+                
+                ##### coupled일 경우 걔의 값들도 가져온다
+                if agent.coupled:
+                    cur_pos_following = agent_following.pos[:]
+                    cur_cell_following = self.grid.get(*cur_pos_following)
+                    while not cur_cell_following:
+                        self.grid.set(*cur_pos_following, agent_following)
+                        cur_cell_following = self.grid.get(*cur_pos_following)
+                        print(f"cur_cell: {cur_cell_following}")
+                    fwd_pos_following = agent_following.front_pos[:]
+                    fwd_cell_following = self.grid.get(*fwd_pos_following)
+                    agent_following_moved = False
+
+                    if not cur_cell_following:
+                        img_fwd_pos = self.grid.render(tile_size=TILE_PIXELS)
+                        if not os.path.isdir(f'./{agent}/'):
+                            os.makedirs(f'./{agent}/')
+                        plt.imsave(f'./{agent}/' + f'{agent} not cur_cell_follwing_fwd_cell.jpeg', img_fwd_pos/255.)
+                #######
 
 
                 # right, down, left, up
                 if action in {0, 1, 2, 3}:
                     # update direction
                     agent.dir = action
-
                     # move forward (if allowed)
-                    can_move = fwd_cell is None or fwd_cell.can_overlap()
+                    ############# agent_free 추가
+                    can_move = (fwd_cell is None or fwd_cell.can_overlap()) and agent.agent_free
+                    can_move_following = False
+                    
+                    if agent.coupled:
+                        agent_following.dir = action
+                        can_move_following = (fwd_cell_following is None or fwd_cell_following.can_overlap()) and agent_following.agent_free
+                    #############
+                    
                     if can_move:
                         agent_moved = True
                         # Add agent to new cell
@@ -764,23 +801,26 @@ class MultiGridEnv(gym.Env):
                             agent.pos = fwd_pos
                         
                         #######
-                        if not cur_cell:
-                            img_cur_pos = self.grid.render(tile_size=TILE_PIXELS)
-                            if not os.path.isdir(f'./{agent}/'):
-                                os.makedirs(f'./{agent}/')
-                            plt.imsave(f'./{agent}/' + f'{agent} not cur_cell after move.jpeg', img_cur_pos/255.)
+                        # if not cur_cell:
+                        #     img_cur_pos = self.grid.render(tile_size=TILE_PIXELS)
+                        #     if not os.path.isdir(f'./{agent}/'):
+                        #         os.makedirs(f'./{agent}/')
+                        #     plt.imsave(f'./{agent}/' + f'{agent} not cur_cell after move.jpeg', img_cur_pos/255.)
                         #######
 
                         # Remove agent from old cell
                         if cur_cell == agent:
                             self.grid.set(*cur_pos, None)
                         else:
+                            #############################
+                            # assert cur_cell.can_overlap()
                             if not hasattr(cur_cell,'can_overlap'):
                                 pass
                             else:
                                 if agent in cur_cell.agents:
                                     cur_cell.agents.remove(agent)
-                            # assert cur_cell.can_overlap()   #marlgrid.agents.GridAgentInterface object
+                            #marlgrid.agents.GridAgentInterface object
+                            ##################################
                             
                         # Add agent's agents to old cell
                         for left_behind in agent.agents:
@@ -795,7 +835,46 @@ class MultiGridEnv(gym.Env):
                         # After moving, the agent shouldn't
                         # contain any other agents.
                         agent.agents = []
+                        
+                        if can_move_following:
+                            agent_following_moved = True
+                            # Add agent to new cell
+                            if fwd_cell_following is None:
+                                self.grid.set(*fwd_pos_following, agent_following)
+                                agent_following.pos = fwd_pos_following
+                            else:
+                                fwd_cell_following.agents.append(agent_following)
+                                agent_following.pos = fwd_pos_following
 
+                            # Remove agent from old cell
+                            if cur_cell_following == agent:
+                                self.grid.set(*cur_pos_following, None)
+                            else:
+                                #############################
+                                # assert cur_cell.can_overlap()
+                                if not hasattr(cur_cell_following,'can_overlap'):
+                                    pass
+                                else:
+                                    if agent in cur_cell_following.agents:
+                                        cur_cell_following.agents.remove(agent)
+                                #marlgrid.agents.GridAgentInterface object
+                                ##################################
+                                
+                            # Add agent's agents to old cell
+                            for left_behind in agent_following.agents:
+                                cur_obj_following = self.grid.get(*cur_pos_following)
+                                if cur_obj_following is None:
+                                    self.grid.set(*cur_pos_following, left_behind)
+                                elif cur_obj_following.can_overlap():
+                                    cur_obj_following.agents.append(left_behind)
+                                else:  # How was "agent" there in the first place?
+                                    raise ValueError('?!?!?!')
+
+                            # After moving, the agent shouldn't
+                            # contain any other agents.
+                            agent_following.agents = []
+
+                        ######### 하단이 원본 코드들
                         # agent can only receive rewards if fwd_cell has a
                         # "get_reward" method && the agent is not already done #이 아니라 carrying 아닐 때
                         # # if action == agent.actions.pickup and   
@@ -805,9 +884,12 @@ class MultiGridEnv(gym.Env):
                         #             rwd, agent_no)
                         #         env_rewards += env_rew
                         #         step_rewards += step_rew
+                        ####################
 
                 # Pick up an object
-                elif action == agent.actions.pickup:
+                ##################
+                elif action == agent.actions.pickup and agent.agent_free:
+                    ################
                     if fwd_cell and fwd_cell.can_pickup():
                         if agent.carrying is None:
                             if isinstance(fwd_cell, Goal):
@@ -823,48 +905,43 @@ class MultiGridEnv(gym.Env):
                                         agent.carrying.cur_pos = np.array([-1, -1])
                                         self.grid.set(*fwd_pos, None)
                                     else:
-                                        if fwd_cell.tagged == True:
-                                            rwd = 1
+                                        if fwd_cell.tagged_list:
+                                            rwd = 2
                                             env_rew, step_rew = self._get_reward(
                                                 rwd, agent_no)
                                             env_rewards += env_rew
                                             step_rewards += step_rew
-                                            agent_moved = True
                                             # Add agent to temp_cell
-                                            iter = zip(temp_no, temp_cell)
+                                            iter = zip(fwd_cell.tagged_no, fwd_cell.tagged_list)
                                             for agent_tagging_no, agent_tagging in iter:
-                                                agent_tagging.activate()
+                                                agent_tagging.agent_free = True
+                                                agent_tagging.coupled = True
                                                 agent_tagging.carrying = 1
-                                                agent.agent_followed.append(agent_tagging_no)
-                                                # agent_tagging.agent_following = agent_no
+                                                agent_tagging.coupled_list.append(cur_cell)
+                                                agent_tagging.coupled_no.append(agent_no)
+                                                
+                                                agent.coupled_list.append(agent_tagging)
+                                                agent.coupled_no.append(agent_tagging_no)
+                                                
                                             agent.carrying = fwd_cell
                                             agent.carrying.cur_pos = np.array([-1, -1])
                                             self.grid.set(*fwd_pos, None)
-                                            # agent.pos = temp_pos
-                                            # Remove agent from old cell
-                                            # if cur_cell == agent:
-                                            #     self.grid.set(*cur_pos, None)
-                                            # else:
-                                            #     if not hasattr(cur_cell,'can_overlap'):
-                                            #         pass
-                                            #     else:
-                                            #         if agent in cur_cell.agents:
-                                            #             cur_cell.agents.remove(agent)
+                                            agent.coupled = True
                                         else:
                                             rwd = fwd_cell.get_reward(agent)
                                             env_rew, step_rew = self._get_reward(
                                                 rwd, agent_no)
                                             env_rewards += env_rew
                                             step_rewards += step_rew
-                                            fwd_cell.tagged = True
-                                            # temp_pos = cur_cell.pose
-                                            temp_cell.append(cur_cell)
-                                            temp_no.append(agent_no)
-                                            agent.deactivate()
+                                            fwd_cell.tagged_list.append(cur_cell)
+                                            fwd_cell.tagged_no.append(agent_no)
+                                            agent.agent_free = False
                 ###################
 
                 # Drop an object
-                elif action == agent.actions.drop:
+                #################
+                elif action == agent.actions.drop and agent.agent_free:
+                    ###############
                     if fwd_cell and agent.carrying:
                         if isinstance(fwd_cell, Destination):
                             if hasattr(fwd_cell, 'get_reward'):
@@ -878,29 +955,43 @@ class MultiGridEnv(gym.Env):
                                 agent.carrying = None
                             # self.grid.set(*cur_pos, None)
                             ############# 따라가던 애들 다 비우기
-                                if bool(agent.agent_followed):
-                                    for no in agent.agent_followed:
-                                        iter_agents[no][1].carrying = None
+                                if agent.coupled:
+                                    rwd = 2
+                                    env_rew, step_rew = self._get_reward(
+                                        rwd, agent_no)
+                                    env_rewards += env_rew
+                                    step_rewards += step_rew
+                                    for no in agent.coupled_list:
+                                        no.carrying = None
+                                        no.coupled = False
+                                        no.agent_free = True
                             ###############
                         else:
                             pass
 
                 # Toggle/activate an object
-                elif action == agent.actions.toggle:
+                ###########
+                elif action == agent.actions.toggle and agent.agent_free:
+                    ############
                     if fwd_cell:
                         fwd_cell.toggle(agent, fwd_pos)
                     else:
                         pass
 
                 # Done action (same as "do nothing")
-                elif action == agent.actions.done:
+                ###########agent_free 추가
+                elif action == agent.actions.done and agent.agent_free:
                     pass
-
-                else:
+                
+                elif agent.agent_free:
+                    ######### agent_free 추가
                     raise ValueError(
                         f'Environment cannot handle action {action}.')
 
                 agent.on_step(fwd_cell if agent_moved else None)
+                if agent.coupled:
+                    if agent_following:
+                        agent_following.on_step(fwd_cell if agent_following_moved else None)
 
         # If any of the agents individually are "done" (hit Goal)
         # but the env requires respawning, respawn those agents.
@@ -933,9 +1024,9 @@ class MultiGridEnv(gym.Env):
 
         obs = self.gen_obs()
         ##################### return 하기 전에
-        for i, agent in enumerate(agent for agent in self.agents):
-            # obs[i]['agent_following'] = agent.agent_following
-            obs[i]['agent_followed'] = agent.agent_followed
+        # for i, agent in enumerate(agent for agent in self.agents):
+        #     # obs[i]['agent_following'] = agent.agent_following
+        #     obs[i]['coupled_list'] = agent.coupled_list
         ##################
         obs_dict = {f'agent_{i}': obs[i] for i in range(len(obs))}
 
